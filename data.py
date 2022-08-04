@@ -1,17 +1,17 @@
-import config 
+from config import *
 from utils import download_data, process_OSACT2022_data
 
+# args need to tell if it will download data AND/OR preprocess
+
 if __name__ == "__main__":
-    # download_data(config.DATA_PATH,
-    #                 config.DATA_URL
-    # )
+    download_data(DATA_PATH,DATA_URL)
     
     
-    process_OSACT2022_data(config.DATA_PATH, 
-                    config.DATASET_COLUMNS, 
-                    config.DATASET_TEXT, 
-                    config.DATASET_CLASSES, 
-                    config.DATASET_INDEX,
-                    config.USEFUL_COLUMNS
+    process_OSACT2022_data(DATA_PATH, 
+                    DATASET_COLUMNS, 
+                    DATASET_TEXT, 
+                    DATASET_CLASSES, 
+                    DATASET_INDEX,
+                    USEFUL_COLUMNS
     )
 
