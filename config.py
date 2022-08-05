@@ -15,7 +15,7 @@ REPO_PATH = '/'.join(CODE_PATH.split('/')[0:-1])
 DATA_PATH = REPO_PATH + '/' + 'data'
 
 TARGET_LANGUAGE = 'es'
-DOWLOAD_DATA = True
+DOWLOAD_DATA = False
 PROCESS_DATA = True
 
 
@@ -44,6 +44,7 @@ LOGS_PATH = REPO_PATH + '/' + 'logs'
 
 
 INFO_DATA = {'DETOXIS': {
+                    'head': 'toxicity detection',
                     'url':'',
                     'text_col':'comment',
                     'label_col':'toxicity',
@@ -56,6 +57,7 @@ INFO_DATA = {'DETOXIS': {
                     }
                 },
             'EXIST': {
+                    'head': 'sexism detection',
                     'url':'',
                     'text_col':'text',
                     'label_col':'task1',
@@ -68,6 +70,7 @@ INFO_DATA = {'DETOXIS': {
                     }
                 },
             'HatEval': {
+                    'head': 'hate speech detection',
                     'url':'',
                     'text_col':'text',
                     'label_col':'HS',
