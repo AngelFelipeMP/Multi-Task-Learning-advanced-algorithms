@@ -27,6 +27,7 @@ def map_pred(pred, task):
 def test(df_test, task, transformer):
     parameters = transformer_parameters(task, transformer, config.DOMAIN_TRAIN_ALL_DATA)
     
+    # COMMENT I may need to chnage "TransformerDataset_Test" to "TransformerDataset"
     test_dataset = dataset.TransformerDataset_Test(
         text=df_test[config.DATASET_TEXT_PROCESSED].values,
         max_len=parameters['max_len'],
