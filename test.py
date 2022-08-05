@@ -48,6 +48,8 @@ def test(df_test, task, transformer):
     model.load_state_dict(torch.load(parameters['weights']))
     model.to(device)
     
+    # COMMENT the test_fn does not exist anymore
+    # COMMENT it is comment in engine.py
     pred_test = engine.test_fn(test_data_loader, model, device)
     
     return pred_test

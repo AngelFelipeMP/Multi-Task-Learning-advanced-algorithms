@@ -70,6 +70,8 @@ def validation(df_val, task, transformer):
     model.load_state_dict(torch.load(parameters['weights']))
     model.to(device)
     
+    # COMMENT the predict_fn does not exist anymore
+    # COMMENT it is comment in engine.py
     pred_val, targ_val = engine.predict_fn(val_data_loader, model, device)
     
     return pred_val, targ_val
