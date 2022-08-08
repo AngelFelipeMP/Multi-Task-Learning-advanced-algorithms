@@ -92,7 +92,7 @@ def run(df_train, df_val, model_name, heads, max_len, transformer, batch_size, d
 
         
         df_new_results = pd.DataFrame({'model':model_name, #list(model_info.keys())[0]
-                            'dataset': heads, #TODO add index for the dataset or dataset name directly [???]
+                            'data': heads, #TODO add index for the dataset or dataset name directly [???]
                             'epoch':epoch,
                             'transformer':transformer,
                             'max_len':max_len,
@@ -113,7 +113,10 @@ def run(df_train, df_val, model_name, heads, max_len, transformer, batch_size, d
         ) 
         df_results = pd.concat([df_results, df_new_results], ignore_index=True)
         
-        tqdm.write("Epoch {}/{} f1-macro_training = {:.3f}  accuracy_training = {:.3f}  loss_training = {:.3f} f1-macro_val = {:.3f}  accuracy_val = {:.3f}  loss_val = {:.3f}".format(epoch, config.EPOCHS, f1_train, acc_train, loss_train, f1_val, acc_val, loss_val))
+        tqdm.write("Epoch {}/{} f1-macro_training = {:.3f}  accuracy_training = {:.3f}  loss_training = {:.3f} f1-macro_val = {:.3f}  accuracy_val = {:.3f}  loss_val = {:.3f}".format(epoch, 
+                                                                                                                                                                                    config.EPOCHS, 
+                                                                                                                                                                                    train_metrics['f1'], train_metrics['acc'], loss_train, 
+                                                                                                                                                                                    val_metrics['f1'], val_metrics['acc'], loss_val))
 
     return df_results
 
@@ -136,6 +139,8 @@ if __name__ == "__main__":
                                         'dropout',
                                         'accuracy_train',
                                         'f1-macro_train',
+                                        'recall_train',
+                                        'precision_train'
                                         'loss_train',
                                         'accuracy_val',
                                         'f1-score_val',
@@ -146,24 +151,50 @@ if __name__ == "__main__":
         )
     
     #COMMENT: To think about tqdm code
-    inter = len(config.LABELS) * len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
+    inter = len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
     grid_search_bar = tqdm(total=inter, desc='GRID SEARCH', position=2)
 
-    
-    for model, parameters in config.MODELS.items():
+    # get framework such as 'STL', 'MTL0' and etc & parameters
+    for framework, parameters in config.MODELS.items():
         data_dict = dict()
         
-        for data in parameters['data']:
-            for file in config.INFO_DATA[data]['datasets'].values():
-                data_dict[data] = pd.read_csv(config.DATA_PATH + '/'  + file[:-4] + '_merge' + '_processed.csv', nrows=config.N_ROWS)
+        # start model -> get datasets/heads
+        for group_heads in parameters['decoder']['heads']:
+            for head in group_heads.split('-'):
+                
+                # load datasets
+                for file in config.INFO_DATA[head]['datasets'].values():
+                    data_dict[head]['merge'] = pd.read_csv(config.DATA_PATH + '/'  + file[:-4] + '_merge' + '_processed.csv', nrows=config.N_ROWS)
         
-            
-            
-
-
+                    # grid search
+                    for transformer in tqdm(config.TRANSFORMERS, desc='TRANSFOMERS', position=0):
+                        for max_len in config.MAX_LEN:
+                            for batch_size in config.BATCH_SIZE:
+                                for drop_out in config.DROPOUT:
+                                    for lr in config.LR:
+                                        
+                                        # split data
+                                        for data in data_dict.keys():
+                                            for fold, (train_index, val_index) in enumerate(skf.split(data_dict[data]['merge'][config.INFO_DATA[data]['text_col']], data_dict[data]['merge'][config.INFO_DATA[data]['label_col']])):
+                                                data_dict[data]['train'] = data_dict[data]['merge'].loc[train_index]
+                                                data_dict[data]['val'] = data_dict[data]['merge'].loc[val_index]
+                                            
+                    !!!!!!!!!!!! I top HERE !!!!!!!!!!!!!!
+                    #TODO: check split data
+        
+        
+        framework
+        parameters
+        group_heads # for STL group_heads and heads are the same  ->framework level
+        head 
+        data_dict
+        data
+        
+        
+        
     
-    for task in tqdm(config.LABELS, desc='TASKS', position=1):
-        df_grid_search = dfx.loc[dfx[task]>=0].reset_index(drop=True)
+    # for task in tqdm(config.LABELS, desc='TASKS', position=1):
+        # df_grid_search = dfx.loc[dfx[task]>=0].reset_index(drop=True)
         for transformer in tqdm(config.TRANSFORMERS, desc='TRANSFOMERS', position=0):
             for max_len in config.MAX_LEN:
                 for batch_size in config.BATCH_SIZE:
