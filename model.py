@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig
 
-class TransforomerModel(nn.Module):
+class MTLModels(nn.Module):
     def __init__(self, transformer, drop_out, number_of_classes):
-        super(TransforomerModel, self).__init__()
+        super(MTLModels, self).__init__()
         self.number_of_classes = number_of_classes
         self.embedding_size = AutoConfig.from_pretrained(transformer).hidden_size
         self.transformer = AutoModel.from_pretrained(transformer)

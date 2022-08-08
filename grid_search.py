@@ -1,4 +1,4 @@
-import os
+# import os
 import dataset
 import engine
 import torch
@@ -8,7 +8,7 @@ import random
 import config
 from tqdm import tqdm
 
-from model import TransforomerModel
+from model import MTLModels
 import warnings
 warnings.filterwarnings('ignore') 
 from sklearn.model_selection import StratifiedKFold
@@ -18,12 +18,21 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import logging
 logging.set_verbosity_error()
 
+def caculate_metrics(pred, targ, pos_label=1, average='binary'):
+        return {
+                'f1':metrics.f1_score(targ, pred, pos_label=pos_label, average=average), 
+                'acc':metrics.accuracy_score(targ, pred, pos_label=pos_label, average=average), 
+                'recall':metrics.recall_score(targ, pred, pos_label=pos_label, average=average), 
+                'precision':metrics.precision_score(targ, pred, pos_label=pos_label, average=average)
+                }
 
-def run(df_train, df_val, max_len, task, transformer, batch_size, drop_out, lr, df_results):
+# def run(df_train, df_val, max_len, task, transformer, batch_size, drop_out, lr, df_results):
+def run(df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results):
+    
     
     train_dataset = dataset.TransformerDataset(
-        text=df_train[config.DATASET_TEXT_PROCESSED].values,
-        target=df_train[task].values,
+        text=df_train['text_col'].values,
+        target=df_train['label_col'].values,
         max_len=max_len,
         transformer=transformer
     )
@@ -35,8 +44,8 @@ def run(df_train, df_val, max_len, task, transformer, batch_size, drop_out, lr, 
     )
 
     val_dataset = dataset.TransformerDataset(
-        text=df_val[config.DATASET_TEXT_PROCESSED].values,
-        target=df_val[task].values,
+        text=df_val['text_col'].values,
+        target=df_val['label_col'].values,
         max_len=max_len,
         transformer=transformer
     )
@@ -48,7 +57,7 @@ def run(df_train, df_val, max_len, task, transformer, batch_size, drop_out, lr, 
     )
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = TransforomerModel(transformer, drop_out, number_of_classes=df_train[task].max()+1)
+    model = MTLModels(transformer, drop_out, number_of_classes=df_train['label_col'].max()+1)
     model.to(device)
     
     param_optimizer = list(model.named_parameters())
@@ -76,25 +85,29 @@ def run(df_train, df_val, max_len, task, transformer, batch_size, drop_out, lr, 
     
     for epoch in range(1, config.EPOCHS+1):
         pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler)
-        f1_train = metrics.f1_score(targ_train, pred_train, average='macro')
-        acc_train = metrics.accuracy_score(targ_train, pred_train)
+        train_metrics = caculate_metrics(pred_train, targ_train)
         
         pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device)
-        f1_val = metrics.f1_score(targ_val, pred_val, average='macro')
-        acc_val = metrics.accuracy_score(targ_val, pred_val)
+        val_metrics = caculate_metrics(pred_val, targ_val)
+
         
-        df_new_results = pd.DataFrame({'task':task,
+        df_new_results = pd.DataFrame({'model':model_name, #list(model_info.keys())[0]
+                            'dataset': heads, #TODO add index for the dataset or dataset name directly [???]
                             'epoch':epoch,
                             'transformer':transformer,
                             'max_len':max_len,
                             'batch_size':batch_size,
                             'lr':lr,
                             'dropout':drop_out,
-                            'accuracy_train':acc_train,
-                            'f1-macro_train':f1_train,
+                            'accuracy_train':train_metrics['acc'],
+                            'f1-macro_train':train_metrics['f1'],
+                            'recall_train':train_metrics['recall'],
+                            'precision_train':train_metrics['precision'],
                             'loss_train':loss_train,
-                            'accuracy_val':acc_val,
-                            'f1-macro_val':f1_val,
+                            'accuracy_val':val_metrics['acc'],
+                            'f1-score_val':val_metrics['f1'],
+                            'recall_val':val_metrics['recall'],
+                            'precision_val':val_metrics['precision'],
                             'loss_val':loss_val
                         }, index=[0]
         ) 
@@ -109,11 +122,12 @@ if __name__ == "__main__":
     np.random.seed(config.SEED)
     torch.manual_seed(config.SEED)
     torch.cuda.manual_seed_all(config.SEED)
-
-    dfx = pd.read_csv(config.DATA_PATH + '/' + config.DATASET_TRAIN, sep='\t', nrows=config.N_ROWS).fillna("none")
+    
     skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
 
-    df_results = pd.DataFrame(columns=['task',
+    #TODO: confidence interval for the evaluation metrics "df_new_results" $ "df_results"
+    df_results = pd.DataFrame(columns=['model', 
+                                        'data',
                                         'epoch',
                                         'transformer',
                                         'max_len',
@@ -124,13 +138,29 @@ if __name__ == "__main__":
                                         'f1-macro_train',
                                         'loss_train',
                                         'accuracy_val',
-                                        'f1-macro_val',
+                                        'f1-score_val',
+                                        'recall_val',
+                                        'precision_val',
                                         'loss_val'
-            ]
-    )
+                                    ]
+        )
     
+    #COMMENT: To think about tqdm code
     inter = len(config.LABELS) * len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
     grid_search_bar = tqdm(total=inter, desc='GRID SEARCH', position=2)
+
+    
+    for model, parameters in config.MODELS.items():
+        data_dict = dict()
+        
+        for data in parameters['data']:
+            for file in config.INFO_DATA[data]['datasets'].values():
+                data_dict[data] = pd.read_csv(config.DATA_PATH + '/'  + file[:-4] + '_merge' + '_processed.csv', nrows=config.N_ROWS)
+        
+            
+            
+
+
     
     for task in tqdm(config.LABELS, desc='TASKS', position=1):
         df_grid_search = dfx.loc[dfx[task]>=0].reset_index(drop=True)
@@ -205,3 +235,78 @@ if __name__ == "__main__":
 #     return_tensors="pt")
 
 # print(pt_batch)
+
+
+
+
+
+
+# if __name__ == "__main__":
+#     random.seed(config.SEED)
+#     np.random.seed(config.SEED)
+#     torch.manual_seed(config.SEED)
+#     torch.cuda.manual_seed_all(config.SEED)
+
+#     dfx = pd.read_csv(config.DATA_PATH + '/' + config.DATASET_TRAIN, sep='\t', nrows=config.N_ROWS).fillna("none")
+#     skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
+
+#     df_results = pd.DataFrame(columns=['task',
+#                                         'epoch',
+#                                         'transformer',
+#                                         'max_len',
+#                                         'batch_size',
+#                                         'lr',
+#                                         'dropout',
+#                                         'accuracy_train',
+#                                         'f1-macro_train',
+#                                         'loss_train',
+#                                         'accuracy_val',
+#                                         'f1-macro_val',
+#                                         'loss_val'
+#             ]
+#     )
+    
+#     inter = len(config.LABELS) * len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
+#     grid_search_bar = tqdm(total=inter, desc='GRID SEARCH', position=2)
+    
+#     for task in tqdm(config.LABELS, desc='TASKS', position=1):
+#         df_grid_search = dfx.loc[dfx[task]>=0].reset_index(drop=True)
+#         for transformer in tqdm(config.TRANSFORMERS, desc='TRANSFOMERS', position=0):
+#             for max_len in config.MAX_LEN:
+#                 for batch_size in config.BATCH_SIZE:
+#                     for drop_out in config.DROPOUT:
+#                         for lr in config.LR:
+                            
+#                             for fold, (train_index, val_index) in enumerate(skf.split(df_grid_search[config.DATASET_TEXT_PROCESSED], df_grid_search[task])):
+#                                 df_train = df_grid_search.loc[train_index]
+#                                 df_val = df_grid_search.loc[val_index]
+                                
+#                                 tqdm.write(f'\nTask: {task} Transfomer: {transformer.split("/")[-1]} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold+1}/{config.SPLITS}')
+                                
+#                                 df_results = run(df_train,
+#                                                     df_val, 
+#                                                     max_len, 
+#                                                     task, 
+#                                                     transformer, 
+#                                                     batch_size, 
+#                                                     drop_out,
+#                                                     lr,
+#                                                     df_results
+#                                 )
+                            
+#                                 grid_search_bar.update(1)
+                            
+#                             df_results = df_results.groupby(['task',
+#                                                             'epoch',
+#                                                             'transformer',
+#                                                             'max_len',
+#                                                             'batch_size',
+#                                                             'lr',
+#                                                             'dropout'], as_index=False, sort=False)['accuracy_train',
+#                                                                                                 'f1-macro_train',
+#                                                                                                 'loss_train',
+#                                                                                                 'accuracy_val',
+#                                                                                                 'f1-macro_val',
+#                                                                                                 'loss_val'].mean()
+                            
+#                             df_results.to_csv(config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '.csv', index=False)
