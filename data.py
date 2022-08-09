@@ -43,8 +43,8 @@ class DataProcessClass:
     def check_files(self):
         missing_file = []
         # check if the dataset in config file exist
-        for task in INFO_DATA.keys():
-            for file in INFO_DATA[task]['datasets'].values():
+        for data in INFO_DATA.keys():
+            for file in INFO_DATA[data]['datasets'].values():
                 if file not in os.listdir(DATA_PATH):
                     print('File does not exist: {}'.format(file))
                     missing_file.append(file)
@@ -57,58 +57,58 @@ class DataProcessClass:
     
     def process_data(self):
         # get dataset from config file
-        for task in INFO_DATA.keys():
-            for file in INFO_DATA[task]['datasets'].values():
+        for data in INFO_DATA.keys():
+            for file in INFO_DATA[data]['datasets'].values():
                 
                 # read csv file
                 divide_columns = ',' if file[-4:] == '.csv' else '\t'
                 df = pd.read_csv(DATA_PATH + '/'  + file, sep = divide_columns)
                 
                 #remove non-target language text
-                if TARGET_LANGUAGE != INFO_DATA[task]['language']:
-                    if TARGET_LANGUAGE not in INFO_DATA[task]['language']:
+                if TARGET_LANGUAGE != INFO_DATA[data]['language']:
+                    if TARGET_LANGUAGE not in INFO_DATA[data]['language']:
                         print('Target language does not exist in the dataset: {}'.format(file))
                         exit()
                     else:
                         df = df.query('language == "{}"'.format(TARGET_LANGUAGE)).reset_index(drop=True)
                         
                 # add task/had column to the dataframe
-                df['head'] = INFO_DATA[task]['head']
+                df['task'] = INFO_DATA[data]['task']
                 
                 # convert label to number
-                if type(INFO_DATA[task]['positive_class']) == str and not INFO_DATA[task]['positive_class'] == '1':
-                    df[INFO_DATA[task]['label_col']] = df[INFO_DATA[task]['label_col']].apply(lambda x: 1 if x == INFO_DATA[task]['positive_class'] else 0)
+                if type(INFO_DATA[data]['positive_class']) == str and not INFO_DATA[data]['positive_class'] == '1':
+                    df[INFO_DATA[data]['label_col']] = df[INFO_DATA[data]['label_col']].apply(lambda x: 1 if x == INFO_DATA[data]['positive_class'] else 0)
                     
                 # save as a csv file
                 df.to_csv(DATA_PATH + '/' + file[:-4] + '_processed.csv', index=False)
                 
     def merge_data(self):
-        # get task from config file
-        for task in INFO_DATA.keys():
+        # get data from config file
+        for data in INFO_DATA.keys():
             merge_list = []
             
-            # create a list with task files to merge
-            for file in INFO_DATA[task]['datasets'].values():
+            # create a list with data files to merge
+            for file in INFO_DATA[data]['datasets'].values():
                 df = pd.read_csv(DATA_PATH + '/'  + file[:-4] + '_processed.csv')
                 merge_list.append(df)
                 
                 
             if len(merge_list) == 0:
-                print('No processed files for task: {}'.format(task))
-                print('No merging procedure for task: {}'.format(task))
+                print('No processed files for data: {}'.format(data))
+                print('No merging procedure for data: {}'.format(data))
                 exit()
             
             elif len(merge_list) > 0:
                 
                 if len(merge_list) == 1:
-                    print('Only one processed file for task: {}'.format(task))
-                    print('No merging procedure for task: {}'.format(task))
+                    print('Only one processed file for data: {}'.format(data))
+                    print('No merging procedure for data: {}'.format(data))
                 
                 else:
                     df = pd.concat(merge_list, ignore_index=True)
                 
                 df.to_csv(DATA_PATH + '/' + file.split('_')[0] + '_merge' + '_processed.csv', index=False)
-                print('\nMerged file for task: {}'.format(task))
+                print('\nMerged file for data: {}'.format(data))
 
 if __name__ == "__main__":
     DataProcessClass()
