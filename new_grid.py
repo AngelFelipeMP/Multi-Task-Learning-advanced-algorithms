@@ -18,6 +18,27 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import logging
 logging.set_verbosity_error()
 
+class StatisticalTools:
+    def __init__(self):
+        pass
+
+    def ttest(self, value,n_sample):
+        z = 1.96
+        standard_error = math.sqrt((value*(1-value))/n_sample)
+        return round(1.96*standard_error,4) #margin_of_error
+    
+    def add_me(self, data_name, df_results, rows):
+        df = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[data_name]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv')
+        me_col = [col for col in df_results.columns if 'me_' in col]
+        for col in me_col:
+            df_results[col] = df_results.loc[:rows, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]))
+            
+        return df_results
+        
+    
+    #TODO: I need "values" & n_samples
+        
+
 #COMMENT: I should add a task column becase each model may retrieve three lines of results (one for each task/head)
 class DataTools:
     def __init__(self):
@@ -38,9 +59,13 @@ class DataTools:
                                         'precision_train',
                                         'loss_train',
                                         'accuracy_val',
+                                        'me_acc_val',
                                         'f1-score_val',
+                                        'me_f1-score_val',
                                         'recall_val',
+                                        'me_recall_val',
                                         'precision_val',
+                                        'me_precision_val',
                                         'loss_val'
                                     ]
                     )
@@ -54,21 +79,25 @@ class DataTools:
                             'batch_size',
                             'lr',
                             'dropout'], as_index=False, sort=False)['accuracy_train',
-                                                                'f1-score_train',
-                                                                'recall_train',
-                                                                'precision_train',
-                                                                'loss_train',
-                                                                'accuracy_val',
-                                                                'f1-score_val',
-                                                                'recall_val',
-                                                                'precision_val',
-                                                                'loss_val'].mean()
+                                                                    'f1-score_train',
+                                                                    'recall_train',
+                                                                    'precision_train',
+                                                                    'loss_train',
+                                                                    'accuracy_val',
+                                                                    'me_acc_val',
+                                                                    'f1-score_val',
+                                                                    'me_f1-score_val',
+                                                                    'recall_val',
+                                                                    'me_recall_val',
+                                                                    'precision_val',
+                                                                    'me_precision_val',
+                                                                    'loss_val'].mean()
     
     def save_results(self, df):
         df.to_csv(config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '.csv', index=False)
 
 
-class CrossValidation(DataTools):
+class CrossValidation(DataTools, StatisticalTools):
     def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
         super(CrossValidation, self).__init__()
         self.df_train = df_train
@@ -169,9 +198,13 @@ class CrossValidation(DataTools):
                                             'precision_train':train_metrics['precision'],
                                             'loss_train':loss_train,
                                             'accuracy_val':val_metrics['acc'],
+                                            'me_acc_val':0,
                                             'f1-score_val':val_metrics['f1'],
+                                            'me_f1-score_val':0,
                                             'recall_val':val_metrics['recall'],
+                                            'me_recall_val':0,
                                             'precision_val':val_metrics['precision'],
+                                            'me_precision_val':0,
                                             'loss_val':loss_val
                                         }, index=[0]
                             ) 
@@ -185,6 +218,8 @@ class CrossValidation(DataTools):
             # avg and save logs
             if self.fold == config.SPLITS and config.EPOCHS == epoch:
                 self.df_results = super().avg_results(self.df_results)
+                #COMMENT: the add_me inputs must be chnage for MTL trains "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict)"
+                self.df_results = super().add_me(self.model_name, self.df_results, len(self.heads.split('-')))
                 super().save_results(self.df_results)
 
         return self.df_results
@@ -245,7 +280,7 @@ if __name__ == "__main__":
                                         cv = CrossValidation(data_dict[data]['train'],
                                                             data_dict[data]['val'],
                                                             model_name,
-                                                            group_heads,
+                                                            group_heads,  #COMMENT: I shouldn't pass "heads" to function
                                                             max_len, 
                                                             transformer, 
                                                             batch_size, 
@@ -276,7 +311,7 @@ if __name__ == "__main__":
         #     2) ADD REAMIN OF THE CODE [DONE]
         #     3) FIX tddm [DONE]
         #     4) Check avg and save script part [DONE]]
-        #     6) add conidence interval to the results
-        #     7) check logs
-        #     5) TEST CODE [doing
+        #     6) add conidence interval to the results [doing]
+        #     7) check logs [doing]
+        #     5) TEST CODE [doing]
         
