@@ -27,16 +27,15 @@ class StatisticalTools:
         standard_error = math.sqrt((value*(1-value))/n_sample)
         return round(1.96*standard_error,4) #margin_of_error
     
-    def add_me(self, data_name, df_results, rows):
-        df = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[data_name]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv')
+    def add_me(self, data, df_results, rows):
+        #COMMENT: "df.shape[0]" may chnage for the MTL models
+        #COMMENT: I could get "df.shape[0]" from "data_dict[???head/data???]['rows']"
+        df = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[data]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv')
         me_col = [col for col in df_results.columns if 'me_' in col]
         for col in me_col:
-            df_results[col] = df_results.loc[:rows, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]))
+            df_results[col] = df_results.loc[-rows:, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]),axis=1)
             
         return df_results
-        
-    
-    #TODO: I need "values" & n_samples
         
 
 #COMMENT: I should add a task column becase each model may retrieve three lines of results (one for each task/head)
@@ -59,7 +58,7 @@ class DataTools:
                                         'precision_train',
                                         'loss_train',
                                         'accuracy_val',
-                                        'me_acc_val',
+                                        'me_accuracy_val',
                                         'f1-score_val',
                                         'me_f1-score_val',
                                         'recall_val',
@@ -84,7 +83,7 @@ class DataTools:
                                                                     'precision_train',
                                                                     'loss_train',
                                                                     'accuracy_val',
-                                                                    'me_acc_val',
+                                                                    'me_accuracy_val',
                                                                     'f1-score_val',
                                                                     'me_f1-score_val',
                                                                     'recall_val',
@@ -170,6 +169,7 @@ class CrossValidation(DataTools, StatisticalTools):
             },
         ]
 
+        #COMMENT: Do a need to change "num_train_steps" and "scheduler" for the MTL model?
         num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
         optimizer = AdamW(optimizer_parameters, lr=self.lr)
         scheduler = get_linear_schedule_with_warmup(
@@ -198,7 +198,7 @@ class CrossValidation(DataTools, StatisticalTools):
                                             'precision_train':train_metrics['precision'],
                                             'loss_train':loss_train,
                                             'accuracy_val':val_metrics['acc'],
-                                            'me_acc_val':0,
+                                            'me_accuracy_val':0,
                                             'f1-score_val':val_metrics['f1'],
                                             'me_f1-score_val':0,
                                             'recall_val':val_metrics['recall'],
@@ -211,15 +211,15 @@ class CrossValidation(DataTools, StatisticalTools):
             
             self.df_results = pd.concat([self.df_results, df_new_results], ignore_index=True)
             
-            tqdm.write("Epoch {}/{} f1-macro_training = {:.3f}  accuracy_training = {:.3f}  loss_training = {:.3f} f1-macro_val = {:.3f}  accuracy_val = {:.3f}  loss_val = {:.3f}".format(epoch, 
+            tqdm.write("Epoch {}/{} f1-score_training = {:.3f}  accuracy_training = {:.3f}  loss_training = {:.3f} f1-score_val = {:.3f}  accuracy_val = {:.3f}  loss_val = {:.3f}".format(epoch, 
                                                                                                                                                                                         config.EPOCHS, 
                                                                                                                                                                                         train_metrics['f1'], train_metrics['acc'], loss_train, 
                                                                                                                                                                                         val_metrics['f1'], val_metrics['acc'], loss_val))
             # avg and save logs
             if self.fold == config.SPLITS and config.EPOCHS == epoch:
                 self.df_results = super().avg_results(self.df_results)
-                #COMMENT: the add_me inputs must be chnage for MTL trains "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict)"
-                self.df_results = super().add_me(self.model_name, self.df_results, len(self.heads.split('-')))
+                #COMMENT: the add_me inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
+                self.df_results = super().add_me(self.heads, self.df_results, len(self.heads.split('-')))
                 super().save_results(self.df_results)
 
         return self.df_results
@@ -233,7 +233,6 @@ if __name__ == "__main__":
     skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
     df_results = None
 
-    #TODO: confidence interval for the evaluation metrics "df_new_results" & "df_results"
     #COMMENT: To think about tqdm code
     #COMMENT: add feature layers encoder, feature layers decoder
     
@@ -241,7 +240,7 @@ if __name__ == "__main__":
     inter_models =  len(config.MODELS.keys()) * math.prod([len(items['decoder']['heads']) for items in config.MODELS.values()])
     grid_search_bar = tqdm(total=(inter_parameters*inter_models), desc='GRID SEARCH', position=0)
 
-    # get model_name such as 'STL', 'MTL0' and etc & parameters
+    # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
     for model_name, model_characteristics in config.MODELS.items():
         
         # start model -> get datasets/heads
@@ -255,6 +254,7 @@ if __name__ == "__main__":
                 # load datasets & create StratifiedKFold splitter
                 data_dict[head] = {}
                 data_dict[head]['merge'] = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[head]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv', nrows=config.N_ROWS)
+                data_dict[head]['rows'] = data_dict[head]['merge'].shape[0]
                 data_dict[head]['data_split'] = skf.split(data_dict[head]['merge'][config.INFO_DATA[head]['text_col']], data_dict[head]['merge'][config.INFO_DATA[head]['label_col']])
                 
             
@@ -311,7 +311,12 @@ if __name__ == "__main__":
         #     2) ADD REAMIN OF THE CODE [DONE]
         #     3) FIX tddm [DONE]
         #     4) Check avg and save script part [DONE]]
-        #     6) add conidence interval to the results [doing]
-        #     7) check logs [doing]
-        #     5) TEST CODE [doing]
+        #     6) add conidence interval to the results [DONE]
+        #     8) check TODOs in the script [DONE]
+        #     7) check logs [DONE]
+        #     5) TEST CODE [DONE]
+        #     Y) push last code version to github
+        #     X) train models with iniital code
+        #     10) if I am saying the data as I meat to do
+        #     9) plan next steps
         
