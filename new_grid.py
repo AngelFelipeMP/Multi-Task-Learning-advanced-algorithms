@@ -44,6 +44,7 @@ class DataTools:
         pass
     
     def create_df_results(self):
+        #COMMENT: I need to add the column heads as in in the table "Final Results" on google drive
         return pd.DataFrame(columns=['model', 
                                         'data',
                                         'epoch',
@@ -219,6 +220,7 @@ class CrossValidation(DataTools, StatisticalTools):
             if self.fold == config.SPLITS and config.EPOCHS == epoch:
                 self.df_results = super().avg_results(self.df_results)
                 #COMMENT: the add_me inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
+                #COMMENT: preper and save table as on google drive - prepering code for MTL model
                 self.df_results = super().add_me(self.heads, self.df_results, len(self.heads.split('-')))
                 super().save_results(self.df_results)
 
@@ -306,7 +308,7 @@ if __name__ == "__main__":
         # print('@'*100)
         # print(self.df_train.columns)
         
-        # TASKS:
+        # TASKS:tes
         #     1) CHECK THE TWO CLASSES [DONE]
         #     2) ADD REAMIN OF THE CODE [DONE]
         #     3) FIX tddm [DONE]
@@ -315,8 +317,8 @@ if __name__ == "__main__":
         #     8) check TODOs in the script [DONE]
         #     7) check logs [DONE]
         #     5) TEST CODE [DONE]
-        #     Y) push last code version to github
+        #     10) if I am saying the data as I meat to do [DONE]
+        #     Y) push last code version to github 
         #     X) train models with iniital code
-        #     10) if I am saying the data as I meat to do
         #     9) plan next steps
         
