@@ -1,3 +1,4 @@
+import os
 import dataset
 import engine
 import torch
@@ -39,7 +40,7 @@ class StatisticalTools:
         
 
 #COMMENT: I should add a task column becase each model may retrieve three lines of results (one for each task/head)
-class DataTools:
+class MetricTools:
     def __init__(self):
         pass
     
@@ -95,9 +96,49 @@ class DataTools:
     
     def save_results(self, df):
         df.to_csv(config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '.csv', index=False)
+        
+    
+    
+class PredTools:
+    def __init__(self):
+        self.file_name = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions_' +'.csv'
+    
+    
+    def hold_predictions(self, df_val,pred_val, targ_val, 
+                            model_name, heads,
+                            drop_out, lr, batch_size, max_len, transformer,
+                            epoch, fold):
 
+        # precitions columns name
+        self.pred_col = model_name + '_' + heads + '_' + drop_out + '_' + lr + '_' + batch_size + '_' + max_len + '_' + transformer + '_' + epoch + '_' + fold
+        
+        if epoch == 1:
+            self.df = pd.DataFrame({'text':df_val[config.INFO_DATA[heads]['text_col']].values, 
+                                    'target_test':df_val[config.INFO_DATA[heads]['label_col']].values,
+                                    'target':targ_val, 
+                                    self.pred_col:pred_val})
+        else:
+            self.df[self.pred_col] = pred_val
+        
+    def save_predictions(self):
+        if os.path.exists(self.file_name):
+            # join/merge predictions
+            df_saved = pd.read_csv(self.file_name)
+            self.df = pd.concat([df_saved, self.df], ignore_index=True)
+        
+        self.df.to_csv(self.file_name, index=False)
+    
+    def avg_predictions(self):
+        self.df["_".join(self.pred_col.split('_')[:-1])] = self.df[col_list].sum(axis=1)
+        ###################!!!!! STOP HERE !!!!! ####################
+        #TODO: I must finish PredTools
+        
+        
+        
+        
 
-class CrossValidation(DataTools, StatisticalTools):
+#COMMENT: the CrossValidation need to reveive model_characteristics because super().save_predictions() needs it
+class CrossValidation(MetricTools, PredTools, StatisticalTools):
     def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
         super(CrossValidation, self).__init__()
         self.df_train = df_train
@@ -181,8 +222,18 @@ class CrossValidation(DataTools, StatisticalTools):
             pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler)
             train_metrics = self.calculate_metrics(pred_train, targ_train)
             
+            #TODO: Save pred_val in the table
             pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device)
             val_metrics = self.calculate_metrics(pred_val, targ_val)
+            
+            #COMMENT: self.heads must to be splitted in group_heads and head
+            #COMMENT: the fuc must contain framework/model_name, group_heads and head - check logs
+            #COMMENT: the fuc must contain decoder-base, encoder-base and input
+            super().hold_predictions(self.df_val, pred_val, targ_val, 
+                                        self.model_name, self.heads,
+                                        self.drop_out, self.lr, self.batch_size, self.max_len, self.transformer,
+                                        epoch, self.fold
+                                    )
 
             
             df_new_results = pd.DataFrame({'model':self.model_name,
@@ -216,6 +267,11 @@ class CrossValidation(DataTools, StatisticalTools):
                                                                                                                                                                                         config.EPOCHS, 
                                                                                                                                                                                         train_metrics['f1'], train_metrics['acc'], loss_train, 
                                                                                                                                                                                         val_metrics['f1'], val_metrics['acc'], loss_val))
+            #COMMENT: I may move everithing bellow out of the For loop and remove if and else
+            # save predictions
+            if config.EPOCHS == epoch:
+            super().save_predictions()
+            
             # avg and save logs
             if self.fold == config.SPLITS and config.EPOCHS == epoch:
                 self.df_results = super().avg_results(self.df_results)
@@ -223,6 +279,8 @@ class CrossValidation(DataTools, StatisticalTools):
                 #COMMENT: preper and save table as on google drive - prepering code for MTL model
                 self.df_results = super().add_me(self.heads, self.df_results, len(self.heads.split('-')))
                 super().save_results(self.df_results)
+                
+                super().avg_predictions()
 
         return self.df_results
     
@@ -276,7 +334,7 @@ if __name__ == "__main__":
                                         
                                         #COMMENT: move code below out of last for loop
                                         #COMMENT: run must receice data_dict instead of data_dict[data]['train'] or data_dict[data]['val']
-                                        tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold+1}/{config.SPLITS}')
+                                        tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
                                         
                                         #COMMENT: I shouldn't pass "head" or "data" to run function
                                         cv = CrossValidation(data_dict[data]['train'],
@@ -310,15 +368,15 @@ if __name__ == "__main__":
         
         # TASKS:tes
         #     1) CHECK THE TWO CLASSES [DONE]
-        #     2) ADD REAMIN OF THE CODE [DONE]
-        #     3) FIX tddm [DONE]
+        #     2) ADD REMAIN OF THE CODE [DONE]
+        #     3) FIX tqdm [DONE]
         #     4) Check avg and save script part [DONE]]
-        #     6) add conidence interval to the results [DONE]
+        #     6) add confidence interval to the results [DONE]
         #     8) check TODOs in the script [DONE]
         #     7) check logs [DONE]
         #     5) TEST CODE [DONE]
         #     10) if I am saying the data as I meat to do [DONE]
-        #     Y) push last code version to github 
-        #     X) train models with iniital code
-        #     9) plan next steps
+        #     Y) push last code version to github [DONE]
+        #     X) train models with initial code [doing]
+        #     9) plan next steps [doing]
         
