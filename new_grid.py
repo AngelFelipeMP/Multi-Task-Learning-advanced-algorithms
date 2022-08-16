@@ -101,44 +101,54 @@ class MetricTools:
     
 class PredTools:
     def __init__(self):
-        self.file_name = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions_' +'.csv'
+        self.file_grid_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' +'.csv'
+        self.file_fold_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions_' + 'fold' +'.csv'
+        if os.path.isfile(self.file_fold_preds):
+            os.remove(self.file_fold_preds)
     
     
-    def hold_predictions(self, df_val,pred_val, targ_val, 
-                            model_name, heads,
-                            drop_out, lr, batch_size, max_len, transformer,
-                            epoch, fold):
-
-        # precitions columns name
-        self.pred_col = model_name + '_' + heads + '_' + drop_out + '_' + lr + '_' + batch_size + '_' + max_len + '_' + transformer + '_' + epoch + '_' + fold
+    def hold_epoch_preds(self, df_val, pred_val, targ_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer, epoch, fold):
+        # pred columns name
+        #COMMENT: for MTL a need add head or group of heads
+        self.pred_col = model_name + '_' + heads + '_' + str(drop_out) + '_' + str(lr) + '_' + str(batch_size) + '_' + str(max_len) + '_' + transformer + '_' + str(epoch)
         
         if epoch == 1:
-            self.df = pd.DataFrame({'text':df_val[config.INFO_DATA[heads]['text_col']].values, 
-                                    'target_test':df_val[config.INFO_DATA[heads]['label_col']].values,
+            self.df = pd.DataFrame({'text':df_val[config.INFO_DATA[heads]['text_col']].values,
                                     'target':targ_val, 
                                     self.pred_col:pred_val})
         else:
             self.df[self.pred_col] = pred_val
         
-    def save_predictions(self):
-        if os.path.exists(self.file_name):
+    def concat_fold_preds(self):
+        if os.path.exists(self.file_fold_preds):
             # join/merge predictions
-            df_saved = pd.read_csv(self.file_name)
+            df_saved = pd.read_csv(self.file_fold_preds)
             self.df = pd.concat([df_saved, self.df], ignore_index=True)
         
-        self.df.to_csv(self.file_name, index=False)
+        self.df.to_csv(self.file_fold_preds, index=False)
     
-    def avg_predictions(self):
-        self.df["_".join(self.pred_col.split('_')[:-1])] = self.df[col_list].sum(axis=1)
-        ###################!!!!! STOP HERE !!!!! ####################
-        #TODO: I must finish PredTools
+    def save_preds(self):
+        df_fold_preds = pd.read_csv(self.file_fold_preds)
+        #TODO: check if the file exist and print log
         
+        if os.path.exists(self.file_grid_preds):
+            df_grid_preds = pd.read_csv(self.file_grid_preds)
+            # df_fold_preds = pd.concat([df_grid_preds, df_fold_preds], axis='text', ignore_index=True)
+            df_fold_preds = pd.merge(df_grid_preds, df_fold_preds, on=['text','target'], how='outer')
+            #TODO: what todo do if there is a old "gridsearch_predictions.csv" file? I believe I need some how delet it or add coninciodents coluns over the older vergion
+            
         
+        df_fold_preds.to_csv(self.file_grid_preds, index=False)
+        #delet fold dataframe
+        # if os.path.isfile(self.file_fold_preds):
+        #     os.remove(self.file_fold_preds)
         
+        #TODO: double check the funvtion
+        #TODO: double check where a placed the function in side run()
         
 
 #COMMENT: the CrossValidation need to reveive model_characteristics because super().save_predictions() needs it
-class CrossValidation(MetricTools, PredTools, StatisticalTools):
+class CrossValidation(MetricTools, StatisticalTools):
     def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
         super(CrossValidation, self).__init__()
         self.df_train = df_train
@@ -218,6 +228,8 @@ class CrossValidation(MetricTools, PredTools, StatisticalTools):
             optimizer, num_warmup_steps=0, num_training_steps=num_train_steps
         )
         
+        manage_preds = PredTools()
+        
         for epoch in range(1, config.EPOCHS+1):
             pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler)
             train_metrics = self.calculate_metrics(pred_train, targ_train)
@@ -229,12 +241,11 @@ class CrossValidation(MetricTools, PredTools, StatisticalTools):
             #COMMENT: self.heads must to be splitted in group_heads and head
             #COMMENT: the fuc must contain framework/model_name, group_heads and head - check logs
             #COMMENT: the fuc must contain decoder-base, encoder-base and input
-            super().hold_predictions(self.df_val, pred_val, targ_val, 
+            manage_preds.hold_epoch_preds(self.df_val, pred_val, targ_val, 
                                         self.model_name, self.heads,
                                         self.drop_out, self.lr, self.batch_size, self.max_len, self.transformer,
                                         epoch, self.fold
                                     )
-
             
             df_new_results = pd.DataFrame({'model':self.model_name,
                                             'data': self.heads, #COMMENT: add index for the dataset or dataset name directly [???]
@@ -270,7 +281,7 @@ class CrossValidation(MetricTools, PredTools, StatisticalTools):
             #COMMENT: I may move everithing bellow out of the For loop and remove if and else
             # save predictions
             if config.EPOCHS == epoch:
-            super().save_predictions()
+                manage_preds.concat_fold_preds()
             
             # avg and save logs
             if self.fold == config.SPLITS and config.EPOCHS == epoch:
@@ -280,7 +291,7 @@ class CrossValidation(MetricTools, PredTools, StatisticalTools):
                 self.df_results = super().add_me(self.heads, self.df_results, len(self.heads.split('-')))
                 super().save_results(self.df_results)
                 
-                super().avg_predictions()
+                manage_preds.save_preds()
 
         return self.df_results
     
