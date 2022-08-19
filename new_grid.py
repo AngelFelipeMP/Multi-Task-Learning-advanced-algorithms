@@ -31,7 +31,7 @@ class StatisticalTools:
         return round(1.96*standard_error,4) #margin_of_error
     
     def add_me(self, data, df_results, rows):
-        #COMMENT: "df.shape[0]" may chnage for the MTL models
+        #COMMENT: "df.shape[0]" may change for the MTL models
         #COMMENT: I could get "df.shape[0]" from "data_dict[???head/data???]['rows']"
         df = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[data]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv')
         me_col = [col for col in df_results.columns if 'me_' in col]
@@ -41,13 +41,13 @@ class StatisticalTools:
         return df_results
         
 
-#COMMENT: I should add a task column becase each model may retrieve three lines of results (one for each task/head)
+#COMMENT: I should add a task column because each model may retrieve three lines of results (one for each task/head)
 class MetricTools:
     def __init__(self):
         pass
     
     def create_df_results(self):
-        #COMMENT: I need to add the column heads as in in the table "Final Results" on google drive
+        #COMMENT: I need to add the column heads as in the table "Final Results" on google drive
         return pd.DataFrame(columns=['model', 
                                         'data',
                                         'epoch',
@@ -154,7 +154,7 @@ def rename_logs():
             os.rename(config.LOGS_PATH + '/' + file, config.LOGS_PATH + '/' + file[:-4] + '_' + time_str + file[-4:])
         
 
-#COMMENT: the CrossValidation need to reveive model_characteristics because super().save_predictions() needs it
+#COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it
 class CrossValidation(MetricTools, StatisticalTools):
     def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
         super(CrossValidation, self).__init__()
@@ -179,8 +179,8 @@ class CrossValidation(MetricTools, StatisticalTools):
                 }
         
     def run(self):
-        
         #COMMENT: heads cannot to be use to acess data because it will have multiple heads EXIST-DETOXIS-HatEval
+        #COMMENT: I guess run() need to be inside a for loop but it will dependes how I will handle pytorch dataset and dataloader [BIG QUESTION] !!!!!!***
         train_dataset = dataset.TransformerDataset(
             text=self.df_train[config.INFO_DATA[self.heads]['text_col']].values,
             target=self.df_train[config.INFO_DATA[self.heads]['label_col']].values,
@@ -208,7 +208,8 @@ class CrossValidation(MetricTools, StatisticalTools):
         )
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = MTLModels(self.transformer, self.drop_out, number_of_classes=self.df_train[config.INFO_DATA[self.heads]['label_col']].max()+1)
+        # model = MTLModels(self.transformer, self.drop_out, number_of_classes=self.df_train[config.INFO_DATA[self.heads]['label_col']].max()+1)
+        model = MTLModels(self.transformer, self.drop_out, number_of_classes=2, heads=self.heads)
         model.to(device)
         
         param_optimizer = list(model.named_parameters())
@@ -228,13 +229,15 @@ class CrossValidation(MetricTools, StatisticalTools):
             },
         ]
 
-        #COMMENT: Do a need to change "num_train_steps" and "scheduler" for the MTL model?
+        #COMMENT: Do I need to change "num_train_steps" and "scheduler" for the MTL model?*
         num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
         optimizer = AdamW(optimizer_parameters, lr=self.lr)
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=0, num_training_steps=num_train_steps
         )
         
+        #COMMENT: self.heads must to be splitted in group_heads and head
+        #COMMENT: the fuc must contain framework/model_name, group_heads and head - check logs
         # create obt for save preds class
         manage_preds = PredTools(self.df_val,
                                 self.model_name, 
@@ -243,7 +246,7 @@ class CrossValidation(MetricTools, StatisticalTools):
                                 self.lr, 
                                 self.batch_size, 
                                 self.max_len, 
-                                self.transformer,)
+                                self.transformer)
         
         for epoch in range(1, config.EPOCHS+1):
             pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler)
@@ -252,9 +255,6 @@ class CrossValidation(MetricTools, StatisticalTools):
             pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device)
             val_metrics = self.calculate_metrics(pred_val, targ_val)
             
-            #COMMENT: self.heads must to be splitted in group_heads and head
-            #COMMENT: the fuc must contain framework/model_name, group_heads and head - check logs
-            #COMMENT: the fuc must contain decoder-base, encoder-base and input
             # save epoch preds
             manage_preds.hold_epoch_preds(pred_val, targ_val, epoch)
             
@@ -289,7 +289,7 @@ class CrossValidation(MetricTools, StatisticalTools):
                                                                                                                                                                                         config.EPOCHS, 
                                                                                                                                                                                         train_metrics['f1'], train_metrics['acc'], loss_train, 
                                                                                                                                                                                         val_metrics['f1'], val_metrics['acc'], loss_val))
-        #COMMENT: I may move everithing bellow out of the For loop and remove if and else
+        
         # save a fold preds
         manage_preds.concat_fold_preds()
             
@@ -297,7 +297,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         if self.fold == config.SPLITS:
             self.df_results = super().avg_results(self.df_results)
             #COMMENT: the add_me inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
-            #COMMENT: preper and save table as on google drive - prepering code for MTL model
+            #COMMENT: prepare and save table as on google drive - prepering code for MTL model
             self.df_results = super().add_me(self.heads, self.df_results, len(self.heads.split('-')))
             super().save_results(self.df_results)
             
@@ -318,7 +318,6 @@ if __name__ == "__main__":
     skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
     df_results = None
 
-    #COMMENT: To think about tqdm code
     #COMMENT: add feature layers encoder, feature layers decoder
     
     inter_parameters = len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
@@ -329,7 +328,7 @@ if __name__ == "__main__":
     for model_name, model_characteristics in config.MODELS.items():
         
         # start model -> get datasets/heads
-        #COMMENT: Here I can get the other models characteristics for the MTL models
+        #COMMENT: Here I can get the other models characteristics for the MTL models***
         for group_heads in model_characteristics['decoder']['heads']:
             
             # Model script starts Here!
@@ -357,11 +356,12 @@ if __name__ == "__main__":
                                         data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
                                         data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
                                         
-                                        #COMMENT: move code below out of last for loop
-                                        #COMMENT: run must receice data_dict instead of data_dict[data]['train'] or data_dict[data]['val']
+                                        #COMMENT: move code below out of last for loop*
+                                        #COMMENT: run must receice data_dict instead of data_dict[data]['train'] or data_dict[data]['val']***
                                         tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
                                         
                                         #COMMENT: I shouldn't pass "head" or "data" to run function
+                                        #COMMENT: I may remove many input from run() func because I will send data_dict - adapting for MTL models***
                                         cv = CrossValidation(data_dict[data]['train'],
                                                             data_dict[data]['val'],
                                                             model_name,
@@ -392,16 +392,16 @@ if __name__ == "__main__":
         # print(self.df_train.columns)
         
         # TASKS:tes
-        #     1) CHECK THE TWO CLASSES [DONE]
-        #     2) ADD REMAIN OF THE CODE [DONE]
-        #     3) FIX tqdm [DONE]
-        #     4) Check avg and save script part [DONE]]
-        #     6) add confidence interval to the results [DONE]
-        #     8) check TODOs in the script [DONE]
-        #     7) check logs [DONE]
-        #     5) TEST CODE [DONE]
-        #     10) if I am saying the data as I meat to do [DONE]
-        #     Y) push last code version to github [DONE]
-        #     X) train models with initial code [doing]
-        #     9) plan next steps [doing]
+        #     1) check COMMENTS [DONE]
+        #     2) check paper and drive notes [DONE]
+        #     3) check test [DONE]
+        #     4) reading DataLoader MTL web article [doing]
+        #     5) plan the MTL implementation 
+        #     6) Start implementation
+        #     7) 
+        #     8) 
+        #     9) 
+        #     10) 
+        #     11) 
+        #     12) 
         
