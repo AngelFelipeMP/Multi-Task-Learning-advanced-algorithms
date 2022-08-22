@@ -6,16 +6,17 @@ def loss_fn(outputs, targets):
     return nn.CrossEntropyLoss()(outputs, targets)
 
 
-def train_fn(data_loader, model, optimizer, device, scheduler):
+def train_fn(data_loader, model, optimizer, device, scheduler, heads):
     model.train()
     finds = {}
     
-    for i, batch_heads in enumerate(data_loader, start=1):
-        #TODO: data loader need to retrive head plus data
-        #TODO: or train_fn and val_fn need to receive heads
-        for head, batch in batch_heads:
+    for i, batch in enumerate(data_loader):
+        j = 0
+        while j < len(heads.split('-')):
+            head = heads.split('-')[j]
+            j =+ 1
             
-            if i <= 1:
+            if i < 1:
                 finds[head]['targets'] = []
                 finds[head]['predictions'] = []
                 finds[head]['loss'] = 0
@@ -27,27 +28,30 @@ def train_fn(data_loader, model, optimizer, device, scheduler):
             optimizer.zero_grad()
             outputs = model(batch, head)
             loss = loss_fn(outputs, targets)
-            finds[head]['loss'] += loss.cpu().detach().numpy().tolist()/len(batch_heads)
+            finds[head]['loss'] += loss.cpu().detach().numpy().tolist()/len(batch)
             
             finds[head]['targets'].extend(targets.cpu().detach().numpy().tolist())
             _, predictions = torch.max(outputs, 1)
             finds[head]['predictions'].extend(predictions.cpu().detach().numpy().tolist())
             
             loss.backward()
+            #TODO: Ask Ipek or Reyner if loss calculation is correct
         optimizer.step()
         scheduler.step()
 
     return finds
 
 
-def eval_fn(data_loader, model, device):
+def eval_fn(data_loader, model, device, heads):
     model.eval()
     finds = {}
     
     with torch.no_grad():
-        for i, batch_heads in enumerate(data_loader, start=1):
-            #TODO: data loader need to retrive head plus data
-            for head, batch in batch_heads:
+        for i, batch in enumerate(data_loader):
+            j = 0
+            while j < len(heads.split('-')):
+                head = heads.split('-')[j]
+                j =+ 1
                 
                 if i <= 1:
                     finds[head]['targets'] = []
@@ -60,7 +64,7 @@ def eval_fn(data_loader, model, device):
 
                 outputs = model(batch, head)
                 loss = loss_fn(outputs, targets)
-                finds[head]['loss'] += loss.cpu().detach().numpy().tolist()/len(batch_heads)
+                finds[head]['loss'] += loss.cpu().detach().numpy().tolist()/len(batch)
                 
                 finds[head]['targets'].extend(targets.cpu().detach().numpy().tolist())
                 _, predictions = torch.max(outputs, 1)
