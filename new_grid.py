@@ -11,6 +11,8 @@ import config
 from tqdm import tqdm
 from datetime import datetime
 
+from torch.utils.data.dataset import ConcatDataset
+from sampler import BatchSchedulerSampler
 from model import MTLModels
 import warnings
 warnings.filterwarnings('ignore') 
@@ -181,31 +183,49 @@ class CrossValidation(MetricTools, StatisticalTools):
     def run(self):
         #COMMENT: heads cannot to be use to acess data because it will have multiple heads EXIST-DETOXIS-HatEval
         #COMMENT: I guess run() need to be inside a for loop but it will dependes how I will handle pytorch dataset and dataloader [BIG QUESTION] !!!!!!***
-        train_dataset = dataset.TransformerDataset(
-            text=self.df_train[config.INFO_DATA[self.heads]['text_col']].values,
-            target=self.df_train[config.INFO_DATA[self.heads]['label_col']].values,
-            max_len=self.max_len,
-            transformer=self.transformer
-        )
+        self.concat = {'train':[], 'val':[]}
+        
+        # loading datasets
+        for head in self.heads.split('-'):
+            self.concat['train_datasets'].append(dataset.TransformerDataset(
+                text=self.df_train[config.INFO_DATA[head]['text_col']].values,
+                target=self.df_train[config.INFO_DATA[head]['label_col']].values,
+                max_len=self.max_len,
+                transformer=self.transformer
+                )
+            )
+            
+            self.concat['val_datasets'].append(dataset.TransformerDataset(
+                text=self.df_val[config.INFO_DATA[head]['text_col']].values,
+                target=self.df_val[config.INFO_DATA[head]['label_col']].values,
+                max_len=self.max_len,
+                transformer=self.transformer
+                )
+            )
 
+        # concat datasets
+        concat_train = ConcatDataset(self.concat['train_datasets'])
+        concat_val = ConcatDataset(self.concat['val_datasets'])
+        
+        # creating dataloaders
         train_data_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, 
-            batch_size=self.batch_size, 
-            num_workers = config.TRAIN_WORKERS
-        )
-
-        val_dataset = dataset.TransformerDataset(
-            text=self.df_val[config.INFO_DATA[self.heads]['text_col']].values,
-            target=self.df_val[config.INFO_DATA[self.heads]['label_col']].values,
-            max_len=self.max_len,
-            transformer=self.transformer
+            dataset=concat_train,
+            sampler=BatchSchedulerSampler(dataset=concat_train,batch_size=batch_size),
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=config.TRAIN_WORKERS
         )
 
         val_data_loader = torch.utils.data.DataLoader(
-            dataset=val_dataset, 
-            batch_size=self.batch_size, 
+            dataset=concat_val,
+            sampler=BatchSchedulerSampler(dataset=concat_val,batch_size=batch_size),
+            batch_size=self.batch_size,
+            shuffle=False,
             num_workers=config.VAL_WORKERS
         )
+        
+        ####!!!! Do I need one train dataloader? or mode?
+        ####!!!! and Validarion dataset and dataloader?
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # model = MTLModels(self.transformer, self.drop_out, number_of_classes=self.df_train[config.INFO_DATA[self.heads]['label_col']].max()+1)
@@ -249,10 +269,12 @@ class CrossValidation(MetricTools, StatisticalTools):
                                 self.transformer)
         
         for epoch in range(1, config.EPOCHS+1):
-            pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler)
+            #TODO: self.heads need to deleiver group_heads e.g. "EXIST-DETOXIS-HatEval"
+            pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
             train_metrics = self.calculate_metrics(pred_train, targ_train)
             
-            pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device)
+            #TODO: self.heads need to deleiver group_heads e.g. "EXIST-DETOXIS-HatEval"
+            pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device, self.heads)
             val_metrics = self.calculate_metrics(pred_val, targ_val)
             
             # save epoch preds
@@ -395,13 +417,41 @@ if __name__ == "__main__":
         #     1) check COMMENTS [DONE]
         #     2) check paper and drive notes [DONE]
         #     3) check test [DONE]
-        #     4) reading DataLoader MTL web article [doing]
-        #     5) plan the MTL implementation 
-        #     6) Start implementation
-        #     7) 
-        #     8) 
-        #     9) 
-        #     10) 
+        #     4) reading DataLoader MTL web article [DONE]
+        #     5) plan the MTL implementation [DONE]
+        #     6) Start implementation [DONE]
+        #     7) Write dataloader script [ ]
+        #     8) add heads in the dataloader output[ ]
+        #     9) check model.py, engine.py and dataloader.py [ ]
+        #     10) Adapt new_grid_search for MTL [ ]
         #     11) 
         #     12) 
         
+
+
+
+        # train_dataset = dataset.TransformerDataset(
+        #     text=self.df_train[config.INFO_DATA[self.heads]['text_col']].values,
+        #     target=self.df_train[config.INFO_DATA[self.heads]['label_col']].values,
+        #     max_len=self.max_len,
+        #     transformer=self.transformer
+        # )
+
+        # train_data_loader = torch.utils.data.DataLoader(
+        #     dataset=train_dataset, 
+        #     batch_size=self.batch_size, 
+        #     num_workers = config.TRAIN_WORKERS
+        # )
+
+        # val_dataset = dataset.TransformerDataset(
+        #     text=self.df_val[config.INFO_DATA[self.heads]['text_col']].values,
+        #     target=self.df_val[config.INFO_DATA[self.heads]['label_col']].values,
+        #     max_len=self.max_len,
+        #     transformer=self.transformer
+        # )
+
+        # val_data_loader = torch.utils.data.DataLoader(
+        #     dataset=val_dataset, 
+        #     batch_size=self.batch_size, 
+        #     num_workers=config.VAL_WORKERS
+        # )
