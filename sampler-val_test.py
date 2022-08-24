@@ -1,3 +1,4 @@
+#TODO: delet this script as soon as I finished code adaptaion for MTL
 import math
 import torch
 from torch.utils.data.dataset import ConcatDataset
@@ -46,6 +47,8 @@ class BatchSchedulerSampler(torch.utils.data.sampler.Sampler):
             print(self.interactions - remainder)
 
         push_index_val = [0] + self.dataset.cumulative_sizes[:-1]
+        # print('!'*75)
+        # print(push_index_val)
         # step = self.batch_size * self.number_of_datasets # I don't need it 
         # epoch_samples = self.smallest_dataset_size * self.number_of_datasets
         final_samples_list = []  # this is a list of indexes from the combined dataset
@@ -56,7 +59,7 @@ class BatchSchedulerSampler(torch.utils.data.sampler.Sampler):
         
         ########### !!!!!!!!!!!!!!! ANALISE the following code !!!!!!!!!!!!!!!!!!!! ##############
         ########### !!!!!!!!!!!!!!! ANALISE inside loop !!!!!!!!!!!!!!!!!!!! ##############
-        for j in range(1, self.interactions):
+        for j in range(self.interactions):
             print('*'*50)
             print(j)
             
@@ -69,14 +72,19 @@ class BatchSchedulerSampler(torch.utils.data.sampler.Sampler):
                 cur_batch_sampler = sampler_iterators[i]
                 cur_samples = []
                 for _ in range(samples_to_grab):
+                    print('^'*50)
                     try:
                         cur_sample_org = cur_batch_sampler.__next__()
                         cur_sample = cur_sample_org + push_index_val[i]
                         cur_samples.append(cur_sample)
+                        # print(cur_samples)
                     except StopIteration:
+                        print('BREAK')
                         break
-                final_samples_list.extend(cur_samples)
-
+                final_samples_list.append(cur_samples)
+        
+        print(final_samples_list)
+        
         return iter(final_samples_list)
     
     
@@ -84,7 +92,7 @@ class BatchSchedulerSampler(torch.utils.data.sampler.Sampler):
 class MyFirstDataset(torch.utils.data.Dataset):
     def __init__(self):
         # dummy dataset
-        self.samples = torch.cat((-torch.ones(5), torch.ones(5)))
+        self.samples = torch.cat((-torch.ones(6), torch.ones(7)))
 
     def __getitem__(self, index):
         # change this to your samples fetching logic
@@ -98,7 +106,7 @@ class MyFirstDataset(torch.utils.data.Dataset):
 class MySecondDataset(torch.utils.data.Dataset):
     def __init__(self):
         # dummy dataset
-        self.samples = torch.cat((torch.ones(10) * 5, torch.ones(5) * -5))
+        self.samples = torch.cat((torch.ones(10) * 5, torch.ones(7) * -5))
 
     def __getitem__(self, index):
         # change this to your samples fetching logic
@@ -106,22 +114,36 @@ class MySecondDataset(torch.utils.data.Dataset):
 
     def __len__(self):
         # change this to return number of samples in your dataset
-        return self.samples.shape[0]   
+        return self.samples.shape[0]
+    
+    
+class MyThirdDataset(torch.utils.data.Dataset):
+    def __init__(self):
+        # dummy dataset
+        self.samples = torch.cat((torch.ones(9) * 8, torch.ones(11) * -8))
+
+    def __getitem__(self, index):
+        # change this to your samples fetching logic
+        return self.samples[index]
+
+    def __len__(self):
+        # change this to return number of samples in your dataset
+        return self.samples.shape[0]    
 
 if __name__ == "__main__":
     first_dataset = MyFirstDataset()
     second_dataset = MySecondDataset()
-    concat_dataset = ConcatDataset([first_dataset, second_dataset])
+    third_dataset = MyThirdDataset()
+    concat_dataset = ConcatDataset([first_dataset, second_dataset, third_dataset])
     
     
 
-    batch_size = 3
+    batch_size = 4
 
     # dataloader with BatchSchedulerSampler
     dataloader = torch.utils.data.DataLoader(dataset=concat_dataset,
-                                            sampler=BatchSchedulerSampler(dataset=concat_dataset,
+                                            batch_sampler=BatchSchedulerSampler(dataset=concat_dataset,
                                                                         batch_size=batch_size),
-                                            batch_size=batch_size,
                                             shuffle=False)
 
     for inputs in dataloader:
