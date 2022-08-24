@@ -49,6 +49,7 @@ class MetricTools:
         pass
     
     def create_df_results(self):
+        #TODO: the table below needs "model", "heads" and "data" as in the drive table
         #COMMENT: I need to add the column heads as in the table "Final Results" on google drive
         return pd.DataFrame(columns=['model', 
                                         'data',
@@ -158,12 +159,18 @@ def rename_logs():
 
 #COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it
 class CrossValidation(MetricTools, StatisticalTools):
-    def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
+    # def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
+    def __init__(self, model_name, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
         super(CrossValidation, self).__init__()
-        self.df_train = df_train
-        self.df_val = df_val
+        # self.df_train = df_train
+        # self.df_val = df_val
+        # self.heads = heads
+        
+        self.data_dict = data_dict
+        self.heads = data_dict.keys()
+
+        
         self.model_name = model_name
-        self.heads = heads
         self.max_len = max_len
         self.transformer = transformer
         self.batch_size = batch_size
@@ -184,18 +191,18 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.concat = {'train_datasets':[], 'val_datasets':[]}
         #COMMENT: I'll probably need to change "self.df_train" to "self.df_train[head]"
         # loading datasets
-        for head in self.heads.split('-'):
+        for head in self.heads:
             self.concat['train_datasets'].append(dataset.TransformerDataset(
-                text=self.df_train[config.INFO_DATA[head]['text_col']].values,
-                target=self.df_train[config.INFO_DATA[head]['label_col']].values,
+                text=self.data_dict[head]['train'][config.INFO_DATA[head]['text_col']].values,
+                target=self.data_dict[head]['train'][config.INFO_DATA[head]['label_col']].values,
                 max_len=self.max_len,
                 transformer=self.transformer
                 )
             )
             
             self.concat['val_datasets'].append(dataset.TransformerDataset(
-                text=self.df_val[config.INFO_DATA[head]['text_col']].values,
-                target=self.df_val[config.INFO_DATA[head]['label_col']].values,
+                text=self.data_dict[head]['val'][config.INFO_DATA[head]['text_col']].values,
+                target=self.data_dict[head]['val'][config.INFO_DATA[head]['label_col']].values,
                 max_len=self.max_len,
                 transformer=self.transformer
                 )
@@ -244,9 +251,14 @@ class CrossValidation(MetricTools, StatisticalTools):
         ]
 
         #TODO: Adapt code below
+        ####!!!!!!!!!!!!! VERY IMPORT check the input heads in all class and functions !!!!!!!!!!!!!####
+        ####!!!!!!!!!!!!! it changed from DETOXIS-HatEval-DETOXIS to  ['DETOXI','HatEval','DETOXIS'] !!!!!!!!!!!!!!####
+        
         #COMMENT:  "num_train_steps" depend on  "self.df_train" and it my change for MTL.
         #COMMENT: I'll probably need to change "self.df_train" to "self.df_train[head]" for the biggest dataset
         #COMMENT: I can use "data_dict[head]['rows']" to identify the biggest dataset
+        for self.dataset['head']['rows']
+        
         num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
         optimizer = AdamW(optimizer_parameters, lr=self.lr)
         scheduler = get_linear_schedule_with_warmup(
@@ -318,7 +330,7 @@ class CrossValidation(MetricTools, StatisticalTools):
             self.df_results = super().avg_results(self.df_results)
             #COMMENT: the "add_me" inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
             #COMMENT: prepare and save table as on google drive - prepering code for MTL model
-            self.df_results = super().add_me(self.heads, self.df_results, len(self.heads.split('-')))
+            self.df_results = super().add_me(self.heads, self.df_results, len(self.heads))
             super().save_results(self.df_results)
             
             # save all folds preds "gridsearch"
@@ -376,27 +388,25 @@ if __name__ == "__main__":
                                         data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
                                         data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
                                         
-                                        #COMMENT: move code below out of last for loop ***
-                                        #COMMENT: run must receice "data_dict" instead of data_dict[data]['train'] or data_dict[data]['val']***
-                                        tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
-                                        
-                                        #COMMENT: I shouldn't pass "head" or "data" to run function ***
-                                        #COMMENT: I may remove many input from run() func because I will send data_dict - adapting for MTL models***
-                                        cv = CrossValidation(data_dict[data]['train'],
-                                                            data_dict[data]['val'],
-                                                            model_name,
-                                                            group_heads,  #COMMENT: I shouldn't pass "heads" to function
-                                                            max_len, 
-                                                            transformer, 
-                                                            batch_size, 
-                                                            drop_out,
-                                                            lr,
-                                                            df_results,
-                                                            fold
-                                        )
-                                        
-                                        df_results = cv.run()
-                                        grid_search_bar.update(1)
+                                    #COMMENT: run must receice "data_dict" instead of data_dict[data]['train'] or data_dict[data]['val']***
+                                    tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
+                                    
+                                    #COMMENT: I shouldn't pass "head" or "data" to run function ***
+                                    #COMMENT: I may remove many input from run() func because I will send data_dict - adapting for MTL models***
+                                    cv = CrossValidation(model_name, 
+                                                        group_heads, #COMMENT: I shouldn't pass "heads" to function I get it from data_dict
+                                                        data_dict, 
+                                                        max_len, 
+                                                        transformer, 
+                                                        batch_size, 
+                                                        drop_out,
+                                                        lr,
+                                                        df_results,
+                                                        fold
+                                    )
+                                    
+                                    df_results = cv.run()
+                                    grid_search_bar.update(1)
                     
 
 

@@ -1,7 +1,7 @@
 import os
 #Hiper-parameters
 SPLITS = 2
-EPOCHS = 1
+EPOCHS = 2
 MAX_LEN = [64] #[128]
 DROPOUT = [0.3]
 LR = [5e-5]
@@ -46,7 +46,7 @@ VAL_WORKERS = 1
 
 INFO_DATA = {'DETOXIS': {
                     'task': 'toxicity detection',
-                    'url':'',
+                    'url':'https://drive.google.com/drive/folders/1KnFDh6oykkhW0h3AS1OhGqnjp-akH10J?usp=sharing',
                     'text_col':'comment',
                     'label_col':'toxicity',
                     'positive_class':1,
@@ -59,7 +59,7 @@ INFO_DATA = {'DETOXIS': {
                 },
             'EXIST': {
                     'task': 'sexism detection',
-                    'url':'',
+                    'url':'https://drive.google.com/drive/folders/1UlxE4jeze3tzfwrwrRywsP2nA4C96U13?usp=sharing',
                     'text_col':'text',
                     'label_col':'task1',
                     'positive_class':'sexist',
@@ -72,7 +72,7 @@ INFO_DATA = {'DETOXIS': {
                 },
             'HatEval': {
                     'task': 'hate speech detection',
-                    'url':'',
+                    'url':'https://drive.google.com/drive/folders/1XAcXmF-jerbQNy_nwzjkBuhjnU7TektN?usp=sharing',
                     'text_col':'text',
                     'label_col':'HS',
                     'positive_class':1,
@@ -90,7 +90,7 @@ MODELS = {
         'STL': {
             'decoder': {
                 'base':'classifier',
-                'heads':['EXIST', 'DETOXIS', 'HatEval']},
+                'heads':['EXIST', 'DETOXIS']},
             'encoder': {
                 'base':'transformer', 
                 'input':['text']}

@@ -11,7 +11,7 @@ class MTLModels(nn.Module):
         self.dropout = nn.Dropout(drop_out)
         self.heads = heads
         self.classifiers = dict()
-        for head in self.heads.split('-'):
+        for head in self.heads:
             # self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.number_of_classes[head]) #TODO: check to number of classes depend on the head/dataset
             self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.number_of_classes)
         

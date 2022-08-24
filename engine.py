@@ -15,7 +15,7 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
         
         optimizer.zero_grad()
         
-        while j < len(heads.split('-')):
+        while j < len(heads):
             head = heads.split('-')[j]
             j =+ 1
             
@@ -50,7 +50,7 @@ def eval_fn(data_loader, model, device, heads):
     with torch.no_grad():
         for i, batch in enumerate(data_loader):
             j = 0
-            while j < len(heads.split('-')):
+            while j < len(heads):
                 head = heads.split('-')[j]
                 j =+ 1
                 
