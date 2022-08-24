@@ -181,10 +181,8 @@ class CrossValidation(MetricTools, StatisticalTools):
                 }
         
     def run(self):
-        #COMMENT: heads cannot to be use to acess data because it will have multiple heads EXIST-DETOXIS-HatEval
-        #COMMENT: I guess run() need to be inside a for loop but it will dependes how I will handle pytorch dataset and dataloader [BIG QUESTION] !!!!!!***
-        self.concat = {'train':[], 'val':[]}
-        
+        self.concat = {'train_datasets':[], 'val_datasets':[]}
+        #COMMENT: I'll probably need to change "self.df_train" to "self.df_train[head]"
         # loading datasets
         for head in self.heads.split('-'):
             self.concat['train_datasets'].append(dataset.TransformerDataset(
@@ -223,8 +221,6 @@ class CrossValidation(MetricTools, StatisticalTools):
             num_workers=config.VAL_WORKERS
         )
         
-        #TODO: Adapt code below
-
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # model = MTLModels(self.transformer, self.drop_out, number_of_classes=self.df_train[config.INFO_DATA[self.heads]['label_col']].max()+1)
         model = MTLModels(self.transformer, self.drop_out, number_of_classes=2, heads=self.heads)
@@ -247,7 +243,10 @@ class CrossValidation(MetricTools, StatisticalTools):
             },
         ]
 
-        #COMMENT: Do I need to change "num_train_steps" and "scheduler" for the MTL model?*
+        #TODO: Adapt code below
+        #COMMENT:  "num_train_steps" depend on  "self.df_train" and it my change for MTL.
+        #COMMENT: I'll probably need to change "self.df_train" to "self.df_train[head]" for the biggest dataset
+        #COMMENT: I can use "data_dict[head]['rows']" to identify the biggest dataset
         num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
         optimizer = AdamW(optimizer_parameters, lr=self.lr)
         scheduler = get_linear_schedule_with_warmup(
@@ -267,17 +266,18 @@ class CrossValidation(MetricTools, StatisticalTools):
                                 self.transformer)
         
         for epoch in range(1, config.EPOCHS+1):
-            #TODO: self.heads need to deleiver group_heads e.g. "EXIST-DETOXIS-HatEval"
+            #TODO: "self.heads" need to deliver "group_heads" e.g. "EXIST-DETOXIS-HatEval"
             pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
             train_metrics = self.calculate_metrics(pred_train, targ_train)
             
-            #TODO: self.heads need to deleiver group_heads e.g. "EXIST-DETOXIS-HatEval"
+            #TODO: "self.heads" need to deliver "group_heads" e.g. "EXIST-DETOXIS-HatEval"
             pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device, self.heads)
             val_metrics = self.calculate_metrics(pred_val, targ_val)
             
             # save epoch preds
             manage_preds.hold_epoch_preds(pred_val, targ_val, epoch)
             
+            #TODO: the table below needs "model", "heads" and "data" as in the drive table
             df_new_results = pd.DataFrame({'model':self.model_name,
                                             'data': self.heads, #COMMENT: add index for the dataset or dataset name directly [???]
                                             'epoch':epoch,
@@ -316,7 +316,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         # avg and save logs
         if self.fold == config.SPLITS:
             self.df_results = super().avg_results(self.df_results)
-            #COMMENT: the add_me inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
+            #COMMENT: the "add_me" inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
             #COMMENT: prepare and save table as on google drive - prepering code for MTL model
             self.df_results = super().add_me(self.heads, self.df_results, len(self.heads.split('-')))
             super().save_results(self.df_results)
@@ -338,7 +338,7 @@ if __name__ == "__main__":
     skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
     df_results = None
 
-    #COMMENT: add feature layers encoder, feature layers decoder
+    #COMMENT: add feature layers encoder, feature layers decoder @
     
     inter_parameters = len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
     inter_models =  len(config.MODELS.keys()) * math.prod([len(items['decoder']['heads']) for items in config.MODELS.values()])
@@ -348,7 +348,7 @@ if __name__ == "__main__":
     for model_name, model_characteristics in config.MODELS.items():
         
         # start model -> get datasets/heads
-        #COMMENT: Here I can get the other models characteristics for the MTL models***
+        #COMMENT: Here I can get the other models characteristics for the MTL models @
         for group_heads in model_characteristics['decoder']['heads']:
             
             # Model script starts Here!
@@ -376,11 +376,11 @@ if __name__ == "__main__":
                                         data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
                                         data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
                                         
-                                        #COMMENT: move code below out of last for loop*
-                                        #COMMENT: run must receice data_dict instead of data_dict[data]['train'] or data_dict[data]['val']***
+                                        #COMMENT: move code below out of last for loop ***
+                                        #COMMENT: run must receice "data_dict" instead of data_dict[data]['train'] or data_dict[data]['val']***
                                         tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
                                         
-                                        #COMMENT: I shouldn't pass "head" or "data" to run function
+                                        #COMMENT: I shouldn't pass "head" or "data" to run function ***
                                         #COMMENT: I may remove many input from run() func because I will send data_dict - adapting for MTL models***
                                         cv = CrossValidation(data_dict[data]['train'],
                                                             data_dict[data]['val'],
@@ -418,11 +418,11 @@ if __name__ == "__main__":
         #     4) reading DataLoader MTL web article [DONE]
         #     5) plan the MTL implementation [DONE]
         #     6) Start implementation [DONE]
-        #     7) Write dataloader script [ ]
-        #     8) add heads in the dataloader output[ ]
-        #     9) check model.py, engine.py and dataloader.py [ ]
-        #     10) Adapt new_grid_search for MTL [ ]
-        #     11) 
+        #     7) Write dataloader script [DONE]
+        #     8) add heads in the dataloader output[X]
+        #     9) check model.py, engine.py and dataloader.py [DONE]
+        #     10) Adapt new_grid_search for MTL - Dataset/DataLoader [DONE]
+        #     11) Adapt new_grid_search for MTL - remaining [ ]
         #     12) 
         
 
