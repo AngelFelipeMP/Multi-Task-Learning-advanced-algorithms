@@ -12,7 +12,7 @@ from tqdm import tqdm
 from datetime import datetime
 
 from torch.utils.data.dataset import ConcatDataset
-from sampler import BatchSchedulerSampler
+from samplers import BatchSamplerTrain, BatchSamplerValidation
 from model import MTLModels
 import warnings
 warnings.filterwarnings('ignore') 
@@ -210,7 +210,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         # creating dataloaders
         train_data_loader = torch.utils.data.DataLoader(
             dataset=concat_train,
-            sampler=BatchSchedulerSampler(dataset=concat_train,batch_size=batch_size),
+            sampler=BatchSamplerTrain(dataset=concat_train,batch_size=batch_size),
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=config.TRAIN_WORKERS
@@ -218,14 +218,12 @@ class CrossValidation(MetricTools, StatisticalTools):
 
         val_data_loader = torch.utils.data.DataLoader(
             dataset=concat_val,
-            sampler=BatchSchedulerSampler(dataset=concat_val,batch_size=batch_size),
-            batch_size=self.batch_size,
+            batch_sampler=BatchSamplerValidation(dataset=concat_val,batch_size=batch_size),
             shuffle=False,
             num_workers=config.VAL_WORKERS
         )
         
-        ####!!!! Do I need one train dataloader? or mode?
-        ####!!!! and Validarion dataset and dataloader?
+        #TODO: Adapt code below
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # model = MTLModels(self.transformer, self.drop_out, number_of_classes=self.df_train[config.INFO_DATA[self.heads]['label_col']].max()+1)
