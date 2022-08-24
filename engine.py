@@ -12,6 +12,9 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
     
     for i, batch in enumerate(data_loader):
         j = 0
+        
+        optimizer.zero_grad()
+        
         while j < len(heads.split('-')):
             head = heads.split('-')[j]
             j =+ 1
@@ -25,7 +28,6 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
             targets = batch["targets"]
             del batch["targets"]
 
-            optimizer.zero_grad()
             outputs = model(batch, head)
             loss = loss_fn(outputs, targets)
             finds[head]['loss'] += loss.cpu().detach().numpy().tolist()/len(batch)
@@ -35,7 +37,6 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
             finds[head]['predictions'].extend(predictions.cpu().detach().numpy().tolist())
             
             loss.backward()
-            #TODO: Ask Ipek or Reyner if loss calculation is correct
         optimizer.step()
         scheduler.step()
 
