@@ -23,6 +23,9 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import logging
 logging.set_verbosity_error()
 
+
+### STOP HERE### ------------------------------
+#### adapt Class StatisticalTools for MTL 
 class StatisticalTools:
     def __init__(self):
         pass
@@ -32,25 +35,30 @@ class StatisticalTools:
         standard_error = math.sqrt((value*(1-value))/n_sample)
         return round(1.96*standard_error,4) #margin_of_error
     
-    def add_me(self, data, df_results, rows):
+    # def add_me(self, data, df_results, rows):
+    def add_me(self, .data_dict, data, df_results):
         #COMMENT: "df.shape[0]" may change for the MTL models
         #COMMENT: I could get "df.shape[0]" from "data_dict[???head/data???]['rows']"
         df = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[data]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv')
-        me_col = [col for col in df_results.columns if 'me_' in col]
-        for col in me_col:
-            df_results[col] = df_results.loc[-rows:, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]),axis=1)
-            
+        
+        for col in df_results.columns:
+            if 'me_' in col:
+                df_results[col] = df_results.loc[-len(data):, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]),axis=1)
+        
         return df_results
         
+        # me_col = [col for col in df_results.columns if 'me_' in col]
+        # for col in me_col:
+        #     df_results[col] = df_results.loc[-rows:, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]),axis=1)
+        
+        # return df_results
+        
 
-#COMMENT: I should add a task column because each model may retrieve three lines of results (one for each task/head)
 class MetricTools:
     def __init__(self):
         pass
     
     def create_df_results(self):
-        #TODO: the table below needs "model", "heads" and "data" as in the drive table
-        #COMMENT: I need to add the column heads as in the table "Final Results" on google drive
         return pd.DataFrame(columns=['model',
                                         'heads'
                                         'data',
@@ -314,40 +322,46 @@ class CrossValidation(MetricTools, StatisticalTools):
             
             #COMMENT: create/add the creation and fall filling the df_new_results
             #TODO: the table below needs "model", "heads" and "data" as in the drive table
+            list_new_results =[]
             for head in self.heads:
-                df_new_results = pd.DataFrame({'model':self.model_name,
+                list_new_results.append(pd.DataFrame({'model':self.model_name,
                                                 'heads':self.heads,
-                                                'data': head, #COMMENT: add index for the dataset or dataset name directly [???]
+                                                'data': head,
                                                 'epoch':epoch,
                                                 'transformer':self.transformer,
                                                 'max_len':self.max_len,
                                                 'batch_size':self.batch_size,
                                                 'lr':self.lr,
                                                 'dropout':self.drop_out,
-                                                'accuracy_train':train_metrics['acc'],
-                                                'f1-score_train':train_metrics['f1'],
-                                                'recall_train':train_metrics['recall'],
-                                                'precision_train':train_metrics['precision'],
-                                                # 'loss_train':loss_train,
-                                                'loss_train':output_train[],
-                                                'accuracy_val':val_metrics['acc'],
+                                                'accuracy_train':train_metrics[head]['acc'],
+                                                'f1-score_train':train_metrics[head]['f1'],
+                                                'recall_train':train_metrics[head]['recall'],
+                                                'precision_train':train_metrics[head]['precision'],
+                                                'loss_train':output_train[head]['loss'],
+                                                'accuracy_val':val_metrics[head]['acc'],
                                                 'me_accuracy_val':0,
-                                                'f1-score_val':val_metrics['f1'],
+                                                'f1-score_val':val_metrics[head]['f1'],
                                                 'me_f1-score_val':0,
-                                                'recall_val':val_metrics['recall'],
+                                                'recall_val':val_metrics[head]['recall'],
                                                 'me_recall_val':0,
-                                                'precision_val':val_metrics['precision'],
+                                                'precision_val':val_metrics[head]['precision'],
                                                 'me_precision_val':0,
-                                                'loss_val':output_val[]
+                                                'loss_val':output_val[head]['loss'],
                                             }, index=[0]
-                                ) 
+                                )
+                )
             
-            self.df_results = pd.concat([self.df_results, df_new_results], ignore_index=True)
+            self.df_results = pd.concat([self.df_results, *list_new_results], ignore_index=True)
             
-            tqdm.write("Epoch {}/{} f1-score_training = {:.3f}  accuracy_training = {:.3f}  loss_training = {:.3f} f1-score_val = {:.3f}  accuracy_val = {:.3f}  loss_val = {:.3f}".format(epoch, 
-                                                                                                                                                                                        config.EPOCHS, 
-                                                                                                                                                                                        train_metrics['f1'], train_metrics['acc'], loss_train, 
-                                                                                                                                                                                        val_metrics['f1'], val_metrics['acc'], loss_val))
+            for head in self.heads:
+                tqdm.write("Epoch {}/{} Model: {}".format(epoch,config.EPOCHS, "-".join(self.heads)))
+                tqdm.write("  Head: {} f1-score_training = {:.3f}  accuracy_training = {:.3f}  loss_training = {:.3f} f1-score_val = {:.3f}  accuracy_val = {:.3f}  loss_val = {:.3f}".format(head,
+                                                                                                                                                                                        train_metrics[head]['f1'], 
+                                                                                                                                                                                        train_metrics[head]['acc'], 
+                                                                                                                                                                                        output_train[head]['loss'], 
+                                                                                                                                                                                        val_metrics[head]['f1'], 
+                                                                                                                                                                                        val_metrics[head]['acc'], 
+                                                                                                                                                                                        output_val[head]['loss']))
         
         # save a fold preds
         manage_preds.concat_fold_preds()
@@ -357,7 +371,8 @@ class CrossValidation(MetricTools, StatisticalTools):
             self.df_results = super().avg_results(self.df_results)
             #COMMENT: the "add_me" inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
             #COMMENT: prepare and save table as on google drive - prepering code for MTL model
-            self.df_results = super().add_me(self.heads, self.df_results, len(self.heads))
+            # self.df_results = super().add_me(self.heads, self.df_results, len(self.heads))
+            self.df_results = super().add_me(self.data_dict, self.heads, self.df_results)
             super().save_results(self.df_results)
             
             # save all folds preds "gridsearch"
