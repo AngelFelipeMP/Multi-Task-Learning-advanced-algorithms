@@ -104,29 +104,35 @@ class MetricTools:
         
         
 class PredTools:
-    def __init__(self, df_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
+    # def __init__(self, df_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
+    def __init__(self, data_dict, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
         self.file_grid_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' +'.csv'
         self.file_fold_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' + '_fold' +'.csv'
-        self.df_val = df_val
-        self.model_name = model_name
+        # self.df_val = df_val
+        self.data_dict = data_dict
         self.heads = heads
+        self.list_df = []
+        self.model_name = model_name
         self.drop_out = drop_out
         self.lr = lr
         self.batch_size = batch_size
         self.max_len = max_len
         self.transformer = transformer
     
-    def hold_epoch_preds(self, pred_val, targ_val, epoch):
-        # pred columns name
-        #COMMENT: for MTL a need add head or group of heads
-        self.pred_col = self.model_name + '_' + self.heads + '_' + str(self.drop_out) + '_' + str(self.lr) + '_' + str(self.batch_size) + '_' + str(self.max_len) + '_' + self.transformer + '_' + str(epoch)
+    def hold_epoch_preds(self, output_val, epoch):
+        for index, head in enumerate(self.heads):
+            # pred columns name
+            pred_col = self.model_name + '_' + "-".join(self.heads) + '_' + head + '_' + str(self.drop_out) + '_' + str(self.lr) + '_' + str(self.batch_size) + '_' + str(self.max_len) + '_' + self.transformer + '_' + str(epoch)
+            
+            if epoch == 1:
+                self.list_df.append(pd.DataFrame({'text':self.data_dict[head]['val'][config.INFO_DATA[head]['text_col']].values,
+                                            'target':output_val[head]['targets'],
+                                            pred_col:output_val[head]['predictions']}))
+            else:
+                self.list_df[index][pred_col] = output_val[head]['predictions']
         
-        if epoch == 1:
-            self.df_fold_preds = pd.DataFrame({'text':self.df_val[config.INFO_DATA[self.heads]['text_col']].values,
-                                    'target':targ_val, 
-                                    self.pred_col:pred_val})
-        else:
-            self.df_fold_preds[self.pred_col] = pred_val
+        if epoch == config.EPOCHS:
+            self.df_fold_preds = pd.concat(self.list_df, ignore_index=True)
         
     def concat_fold_preds(self):
         # concat folder's predictions
@@ -155,22 +161,31 @@ def rename_logs():
     for file in os.listdir(config.LOGS_PATH):
         if not bool(re.search(r'\d', file)):
             os.rename(config.LOGS_PATH + '/' + file, config.LOGS_PATH + '/' + file[:-4] + '_' + time_str + file[-4:])
+            
+            
+def longer_dataset(data_dict):
+    bigger = 0
+    for head in data_dict.keys():
+        if data_dict[head]['rows'] > bigger:
+            bigger = data_dict[head]['rows']
+            dataset = head
+    
+    return dataset
         
 
 #COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it
 class CrossValidation(MetricTools, StatisticalTools):
     # def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
-    def __init__(self, model_name, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
+    def __init__(self, model_name, heads,data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
         super(CrossValidation, self).__init__()
         # self.df_train = df_train
         # self.df_val = df_val
-        # self.heads = heads
-        
-        self.data_dict = data_dict
-        self.heads = data_dict.keys()
-
         
         self.model_name = model_name
+        self.data_dict = data_dict
+        self.heads = heads.split('-')
+        
+        
         self.max_len = max_len
         self.transformer = transformer
         self.batch_size = batch_size
@@ -251,15 +266,11 @@ class CrossValidation(MetricTools, StatisticalTools):
         ]
 
         #TODO: Adapt code below
-        ####!!!!!!!!!!!!! VERY IMPORT check the input heads in all class and functions !!!!!!!!!!!!!####
-        ####!!!!!!!!!!!!! it changed from DETOXIS-HatEval-DETOXIS to  ['DETOXI','HatEval','DETOXIS'] !!!!!!!!!!!!!!####
+        #TODO: VERY IMPORT - check the input heads in all class and functions !!!!!!!!!!!!!
+        #TODO: VERY IMPORT - it changed from DETOXIS-HatEval-DETOXIS to  ['DETOXI','HatEval','DETOXIS'] !!!!!!!!!!!!!!
         
-        #COMMENT:  "num_train_steps" depend on  "self.df_train" and it my change for MTL.
-        #COMMENT: I'll probably need to change "self.df_train" to "self.df_train[head]" for the biggest dataset
-        #COMMENT: I can use "data_dict[head]['rows']" to identify the biggest dataset
-        for self.dataset['head']['rows']
-        
-        num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
+        # num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
+        num_train_steps = int(len(self.data_dict[longer_dataset(self.data_dict)]['train']) / self.batch_size * config.EPOCHS)
         optimizer = AdamW(optimizer_parameters, lr=self.lr)
         scheduler = get_linear_schedule_with_warmup(
             optimizer, num_warmup_steps=0, num_training_steps=num_train_steps
@@ -268,7 +279,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         #COMMENT: self.heads must to be splitted in group_heads and head
         #COMMENT: the fuc must contain framework/model_name, group_heads and head - check logs
         # create obt for save preds class
-        manage_preds = PredTools(self.df_val,
+        manage_preds = PredTools(self.data_dict,
                                 self.model_name, 
                                 self.heads,
                                 self.drop_out, 
@@ -279,15 +290,23 @@ class CrossValidation(MetricTools, StatisticalTools):
         
         for epoch in range(1, config.EPOCHS+1):
             #TODO: "self.heads" need to deliver "group_heads" e.g. "EXIST-DETOXIS-HatEval"
-            pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
-            train_metrics = self.calculate_metrics(pred_train, targ_train)
+            # pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
+            output_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
+            #TODO: modify "calculate_metrics" for the new input format
+            # train_metrics = self.calculate_metrics(pred_train, targ_train)
+            train_metrics = self.calculate_metrics(output_train)
+            
             
             #TODO: "self.heads" need to deliver "group_heads" e.g. "EXIST-DETOXIS-HatEval"
-            pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device, self.heads)
-            val_metrics = self.calculate_metrics(pred_val, targ_val)
+            # pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device, self.heads)
+            output_val = engine.eval_fn(val_data_loader, model, device, self.heads)
+            #TODO: modify "calculate_metrics" for the new input format
+            # val_metrics = self.calculate_metrics(pred_val, targ_val)
+            val_metrics = self.calculate_metrics(output_val)
             
             # save epoch preds
-            manage_preds.hold_epoch_preds(pred_val, targ_val, epoch)
+            # manage_preds.hold_epoch_preds(pred_val, targ_val, epoch)
+            manage_preds.hold_epoch_preds(output_val, epoch)
             
             #TODO: the table below needs "model", "heads" and "data" as in the drive table
             df_new_results = pd.DataFrame({'model':self.model_name,
@@ -357,6 +376,8 @@ if __name__ == "__main__":
     grid_search_bar = tqdm(total=(inter_parameters*inter_models), desc='GRID SEARCH', position=0)
 
     # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
+    #COMMENT: i may send everything "model_name, model_characteristics" together to "CrossValidation()"
+    #COMMENT: related comment below
     for model_name, model_characteristics in config.MODELS.items():
         
         # start model -> get datasets/heads
@@ -438,28 +459,51 @@ if __name__ == "__main__":
 
 
 
-        # train_dataset = dataset.TransformerDataset(
-        #     text=self.df_train[config.INFO_DATA[self.heads]['text_col']].values,
-        #     target=self.df_train[config.INFO_DATA[self.heads]['label_col']].values,
-        #     max_len=self.max_len,
-        #     transformer=self.transformer
-        # )
-
-        # train_data_loader = torch.utils.data.DataLoader(
-        #     dataset=train_dataset, 
-        #     batch_size=self.batch_size, 
-        #     num_workers = config.TRAIN_WORKERS
-        # )
-
-        # val_dataset = dataset.TransformerDataset(
-        #     text=self.df_val[config.INFO_DATA[self.heads]['text_col']].values,
-        #     target=self.df_val[config.INFO_DATA[self.heads]['label_col']].values,
-        #     max_len=self.max_len,
-        #     transformer=self.transformer
-        # )
-
-        # val_data_loader = torch.utils.data.DataLoader(
-        #     dataset=val_dataset, 
-        #     batch_size=self.batch_size, 
-        #     num_workers=config.VAL_WORKERS
-        # )
+# class PredTools:
+#     # def __init__(self, df_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
+#     def __init__(self, df_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
+#         self.file_grid_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' +'.csv'
+#         self.file_fold_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' + '_fold' +'.csv'
+        
+#         self.df_val = df_val
+        
+#         self.model_name = model_name
+#         self.heads = heads
+#         self.drop_out = drop_out
+#         self.lr = lr
+#         self.batch_size = batch_size
+#         self.max_len = max_len
+#         self.transformer = transformer
+    
+#     def hold_epoch_preds(self, pred_val, targ_val, epoch):
+#         # pred columns name
+#         #COMMENT: for MTL a need add head or group of heads
+#         self.pred_col = self.model_name + '_' + self.heads + '_' + str(self.drop_out) + '_' + str(self.lr) + '_' + str(self.batch_size) + '_' + str(self.max_len) + '_' + self.transformer + '_' + str(epoch)
+        
+#         if epoch == 1:
+#             self.df_fold_preds = pd.DataFrame({'text':self.df_val[config.INFO_DATA[self.heads]['text_col']].values,
+#                                     'target':targ_val, 
+#                                     self.pred_col:pred_val})
+#         else:
+#             self.df_fold_preds[self.pred_col] = pred_val
+        
+#     def concat_fold_preds(self):
+#         # concat folder's predictions
+#         if os.path.isfile(self.file_fold_preds):
+#             df_saved = pd.read_csv(self.file_fold_preds)
+#             self.df_fold_preds = pd.concat([df_saved, self.df_fold_preds], ignore_index=True)
+            
+#         # save folder preds
+#         self.df_fold_preds.to_csv(self.file_fold_preds, index=False)
+    
+#     def save_preds(self):
+#         if os.path.isfile(self.file_grid_preds):
+#             df_grid_preds = pd.read_csv(self.file_grid_preds)
+#             self.df_fold_preds = pd.merge(df_grid_preds, self.df_fold_preds, on=['text','target'], how='outer')
+            
+#         # save grid preds
+#         self.df_fold_preds.to_csv(self.file_grid_preds, index=False)
+        
+#         # delete folder preds
+#         if os.path.isfile(self.file_fold_preds):
+#             os.remove(self.file_fold_preds)
