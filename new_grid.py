@@ -51,7 +51,8 @@ class MetricTools:
     def create_df_results(self):
         #TODO: the table below needs "model", "heads" and "data" as in the drive table
         #COMMENT: I need to add the column heads as in the table "Final Results" on google drive
-        return pd.DataFrame(columns=['model', 
+        return pd.DataFrame(columns=['model',
+                                        'heads'
                                         'data',
                                         'epoch',
                                         'transformer',
@@ -78,6 +79,7 @@ class MetricTools:
         
     def avg_results(self, df):
         return df.groupby(['model',
+                            'heads',
                             'data',
                             'epoch',
                             'transformer',
@@ -195,12 +197,14 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.fold = fold
         
     def calculate_metrics(self, pred, targ, pos_label=1, average='binary'):
-        return {
-                'f1':metrics.f1_score(targ, pred, pos_label=pos_label, average=average), 
-                'acc':metrics.accuracy_score(targ, pred), 
-                'recall':metrics.recall_score(targ, pred, pos_label=pos_label, average=average), 
-                'precision':metrics.precision_score(targ, pred, pos_label=pos_label, average=average)
-                }
+        metrics_dict = {}
+        for head in self.heads:
+            metrics_dict[head]['f1'] = metrics.f1_score(targ, pred, pos_label=pos_label, average=average)
+            metrics_dict[head]['acc'] = metrics.accuracy_score(targ, pred)
+            metrics_dict[head]['recall'] = metrics.recall_score(targ, pred, pos_label=pos_label, average=average) 
+            metrics_dict[head]['precision'] = metrics.precision_score(targ, pred, pos_label=pos_label, average=average)
+            
+        return metrics_dict
         
     def run(self):
         self.concat = {'train_datasets':[], 'val_datasets':[]}
@@ -308,31 +312,35 @@ class CrossValidation(MetricTools, StatisticalTools):
             # manage_preds.hold_epoch_preds(pred_val, targ_val, epoch)
             manage_preds.hold_epoch_preds(output_val, epoch)
             
+            #COMMENT: create/add the creation and fall filling the df_new_results
             #TODO: the table below needs "model", "heads" and "data" as in the drive table
-            df_new_results = pd.DataFrame({'model':self.model_name,
-                                            'data': self.heads, #COMMENT: add index for the dataset or dataset name directly [???]
-                                            'epoch':epoch,
-                                            'transformer':self.transformer,
-                                            'max_len':self.max_len,
-                                            'batch_size':self.batch_size,
-                                            'lr':self.lr,
-                                            'dropout':self.drop_out,
-                                            'accuracy_train':train_metrics['acc'],
-                                            'f1-score_train':train_metrics['f1'],
-                                            'recall_train':train_metrics['recall'],
-                                            'precision_train':train_metrics['precision'],
-                                            'loss_train':loss_train,
-                                            'accuracy_val':val_metrics['acc'],
-                                            'me_accuracy_val':0,
-                                            'f1-score_val':val_metrics['f1'],
-                                            'me_f1-score_val':0,
-                                            'recall_val':val_metrics['recall'],
-                                            'me_recall_val':0,
-                                            'precision_val':val_metrics['precision'],
-                                            'me_precision_val':0,
-                                            'loss_val':loss_val
-                                        }, index=[0]
-                            ) 
+            for head in self.heads:
+                df_new_results = pd.DataFrame({'model':self.model_name,
+                                                'heads':self.heads,
+                                                'data': head, #COMMENT: add index for the dataset or dataset name directly [???]
+                                                'epoch':epoch,
+                                                'transformer':self.transformer,
+                                                'max_len':self.max_len,
+                                                'batch_size':self.batch_size,
+                                                'lr':self.lr,
+                                                'dropout':self.drop_out,
+                                                'accuracy_train':train_metrics['acc'],
+                                                'f1-score_train':train_metrics['f1'],
+                                                'recall_train':train_metrics['recall'],
+                                                'precision_train':train_metrics['precision'],
+                                                # 'loss_train':loss_train,
+                                                'loss_train':output_train[],
+                                                'accuracy_val':val_metrics['acc'],
+                                                'me_accuracy_val':0,
+                                                'f1-score_val':val_metrics['f1'],
+                                                'me_f1-score_val':0,
+                                                'recall_val':val_metrics['recall'],
+                                                'me_recall_val':0,
+                                                'precision_val':val_metrics['precision'],
+                                                'me_precision_val':0,
+                                                'loss_val':output_val[]
+                                            }, index=[0]
+                                ) 
             
             self.df_results = pd.concat([self.df_results, df_new_results], ignore_index=True)
             
@@ -459,51 +467,28 @@ if __name__ == "__main__":
 
 
 
-# class PredTools:
-#     # def __init__(self, df_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
-#     def __init__(self, df_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
-#         self.file_grid_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' +'.csv'
-#         self.file_fold_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' + '_fold' +'.csv'
-        
-#         self.df_val = df_val
-        
-#         self.model_name = model_name
-#         self.heads = heads
-#         self.drop_out = drop_out
-#         self.lr = lr
-#         self.batch_size = batch_size
-#         self.max_len = max_len
-#         self.transformer = transformer
-    
-#     def hold_epoch_preds(self, pred_val, targ_val, epoch):
-#         # pred columns name
-#         #COMMENT: for MTL a need add head or group of heads
-#         self.pred_col = self.model_name + '_' + self.heads + '_' + str(self.drop_out) + '_' + str(self.lr) + '_' + str(self.batch_size) + '_' + str(self.max_len) + '_' + self.transformer + '_' + str(epoch)
-        
-#         if epoch == 1:
-#             self.df_fold_preds = pd.DataFrame({'text':self.df_val[config.INFO_DATA[self.heads]['text_col']].values,
-#                                     'target':targ_val, 
-#                                     self.pred_col:pred_val})
-#         else:
-#             self.df_fold_preds[self.pred_col] = pred_val
-        
-#     def concat_fold_preds(self):
-#         # concat folder's predictions
-#         if os.path.isfile(self.file_fold_preds):
-#             df_saved = pd.read_csv(self.file_fold_preds)
-#             self.df_fold_preds = pd.concat([df_saved, self.df_fold_preds], ignore_index=True)
-            
-#         # save folder preds
-#         self.df_fold_preds.to_csv(self.file_fold_preds, index=False)
-    
-#     def save_preds(self):
-#         if os.path.isfile(self.file_grid_preds):
-#             df_grid_preds = pd.read_csv(self.file_grid_preds)
-#             self.df_fold_preds = pd.merge(df_grid_preds, self.df_fold_preds, on=['text','target'], how='outer')
-            
-#         # save grid preds
-#         self.df_fold_preds.to_csv(self.file_grid_preds, index=False)
-        
-#         # delete folder preds
-#         if os.path.isfile(self.file_fold_preds):
-#             os.remove(self.file_fold_preds)
+            # df_new_results = pd.DataFrame({'model':self.model_name,
+            #                                 'data': self.heads, #COMMENT: add index for the dataset or dataset name directly [???]
+            #                                 'epoch':epoch,
+            #                                 'transformer':self.transformer,
+            #                                 'max_len':self.max_len,
+            #                                 'batch_size':self.batch_size,
+            #                                 'lr':self.lr,
+            #                                 'dropout':self.drop_out,
+            #                                 'accuracy_train':train_metrics['acc'],
+            #                                 'f1-score_train':train_metrics['f1'],
+            #                                 'recall_train':train_metrics['recall'],
+            #                                 'precision_train':train_metrics['precision'],
+            #                                 # 'loss_train':loss_train[],
+            #                                 'loss_train':output_train[],
+            #                                 'accuracy_val':val_metrics['acc'],
+            #                                 'me_accuracy_val':0,
+            #                                 'f1-score_val':val_metrics['f1'],
+            #                                 'me_f1-score_val':0,
+            #                                 'recall_val':val_metrics['recall'],
+            #                                 'me_recall_val':0,
+            #                                 'precision_val':val_metrics['precision'],
+            #                                 'me_precision_val':0,
+            #                                 'loss_val':loss_val
+            #                             }, index=[0]
+            #                 ) 
