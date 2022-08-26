@@ -23,9 +23,9 @@ from transformers import get_linear_schedule_with_warmup
 from transformers import logging
 logging.set_verbosity_error()
 
+#COMMENT:  I should make "data_dict[heads][data/head][...]" so I dont need to pass "heads"  I can use "data_dict[heads]"
+#COMMENT: and when I want to acess "data/head" I shoud use "data_dict[heads][data/head]" or "data_dict.values()"
 
-### STOP HERE### ------------------------------
-#### adapt Class StatisticalTools for MTL 
 class StatisticalTools:
     def __init__(self):
         pass
@@ -33,26 +33,17 @@ class StatisticalTools:
     def ttest(self, value,n_sample):
         z = 1.96
         standard_error = math.sqrt((value*(1-value))/n_sample)
-        return round(1.96*standard_error,4) #margin_of_error
+        return round(z*standard_error,4) #margin_of_error
     
     # def add_me(self, data, df_results, rows):
-    def add_me(self, .data_dict, data, df_results):
-        #COMMENT: "df.shape[0]" may change for the MTL models
-        #COMMENT: I could get "df.shape[0]" from "data_dict[???head/data???]['rows']"
-        df = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[data]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv')
+    def add_me(self, data_dict, heads, df_results):
+        last_row = -(len(heads)*config.EPOCHS)
         
         for col in df_results.columns:
             if 'me_' in col:
-                df_results[col] = df_results.loc[-len(data):, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]),axis=1)
+                df_results.loc[df_results.index[last_row]:, col] = df_results.loc[df_results.index[last_row]:, ['data', col[3:]]].apply(lambda x: self.ttest(x[col[3:]], data_dict[x['data']]['rows']),axis=1)
         
         return df_results
-        
-        # me_col = [col for col in df_results.columns if 'me_' in col]
-        # for col in me_col:
-        #     df_results[col] = df_results.loc[-rows:, [col[3:]]].apply(lambda x: self.ttest(x, df.shape[0]),axis=1)
-        
-        # return df_results
-        
 
 class MetricTools:
     def __init__(self):
@@ -369,7 +360,6 @@ class CrossValidation(MetricTools, StatisticalTools):
         # avg and save logs
         if self.fold == config.SPLITS:
             self.df_results = super().avg_results(self.df_results)
-            #COMMENT: the "add_me" inputs must be changed for MTL train "self.model_name" & "len(self.heads.split('-'))" for the last I can use"len(data_dict.keys()) "
             #COMMENT: prepare and save table as on google drive - prepering code for MTL model
             # self.df_results = super().add_me(self.heads, self.df_results, len(self.heads))
             self.df_results = super().add_me(self.data_dict, self.heads, self.df_results)
