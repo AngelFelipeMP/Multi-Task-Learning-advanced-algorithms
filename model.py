@@ -3,7 +3,7 @@ import torch.nn as nn
 from transformers import AutoModel, AutoConfig
 
 class MTLModels(nn.Module):
-    def __init__(self, transformer, drop_out, number_of_classes, heads):
+    def __init__(self, transformer, drop_out, heads, number_of_classes):
         super(MTLModels, self).__init__()
         self.number_of_classes = number_of_classes
         self.embedding_size = AutoConfig.from_pretrained(transformer).hidden_size
