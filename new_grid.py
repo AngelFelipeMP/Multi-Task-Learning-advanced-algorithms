@@ -25,6 +25,7 @@ logging.set_verbosity_error()
 
 #COMMENT:  I should make "data_dict[heads][data/head][...]" so I dont need to pass "heads"  I can use "data_dict[heads]"
 #COMMENT: and when I want to acess "data/head" I shoud use "data_dict[heads][data/head]" or "data_dict.values()"
+#COMMENT: ge the heads "list(data_dict[.keys())[0]"
 
 class StatisticalTools:
     def __init__(self):
@@ -36,7 +37,7 @@ class StatisticalTools:
         return round(z*standard_error,4) #margin_of_error
     
     # def add_me(self, data, df_results, rows):
-    def add_me(self, data_dict, heads, df_results):
+    def add_margin_of_error(self, data_dict, heads, df_results):
         last_row = -(len(heads)*config.EPOCHS)
         
         for col in df_results.columns:
@@ -156,7 +157,9 @@ class PredTools:
         if os.path.isfile(self.file_fold_preds):
             os.remove(self.file_fold_preds)
 
-
+#COMMENT: I my move "rename_logs()" and "longer_dataset(" to CrossValidation 
+#COMMENT: or I move the "calculate_metrics out of the Class"
+#COMMENT: I must follow a code standard 
 def rename_logs():
     time_str = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
     for file in os.listdir(config.LOGS_PATH):
@@ -186,7 +189,6 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.data_dict = data_dict
         self.heads = heads.split('-')
         
-        
         self.max_len = max_len
         self.transformer = transformer
         self.batch_size = batch_size
@@ -195,19 +197,19 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.df_results = df_results if isinstance(df_results, pd.DataFrame) else super().create_df_results()
         self.fold = fold
         
-    def calculate_metrics(self, pred, targ, pos_label=1, average='binary'):
+    # def calculate_metrics(self, pred, targ, pos_label=1, average='binary'):
+    def calculate_metrics(self, output_train, pos_label=1, average='binary'):
         metrics_dict = {}
         for head in self.heads:
-            metrics_dict[head]['f1'] = metrics.f1_score(targ, pred, pos_label=pos_label, average=average)
-            metrics_dict[head]['acc'] = metrics.accuracy_score(targ, pred)
-            metrics_dict[head]['recall'] = metrics.recall_score(targ, pred, pos_label=pos_label, average=average) 
-            metrics_dict[head]['precision'] = metrics.precision_score(targ, pred, pos_label=pos_label, average=average)
+            metrics_dict[head]['f1'] = metrics.f1_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average)
+            metrics_dict[head]['acc'] = metrics.accuracy_score(output_train[head]['targets'], output_train[head]['predictions'])
+            metrics_dict[head]['recall'] = metrics.recall_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average) 
+            metrics_dict[head]['precision'] = metrics.precision_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average)
             
         return metrics_dict
         
     def run(self):
         self.concat = {'train_datasets':[], 'val_datasets':[]}
-        #COMMENT: I'll probably need to change "self.df_train" to "self.df_train[head]"
         # loading datasets
         for head in self.heads:
             self.concat['train_datasets'].append(dataset.TransformerDataset(
@@ -248,7 +250,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         # model = MTLModels(self.transformer, self.drop_out, number_of_classes=self.df_train[config.INFO_DATA[self.heads]['label_col']].max()+1)
-        model = MTLModels(self.transformer, self.drop_out, number_of_classes=2, heads=self.heads)
+        model = MTLModels(self.transformer, self.drop_out, self.heads, number_of_classes=2)
         model.to(device)
         
         param_optimizer = list(model.named_parameters())
@@ -268,10 +270,6 @@ class CrossValidation(MetricTools, StatisticalTools):
             },
         ]
 
-        #TODO: Adapt code below
-        #TODO: VERY IMPORT - check the input heads in all class and functions !!!!!!!!!!!!!
-        #TODO: VERY IMPORT - it changed from DETOXIS-HatEval-DETOXIS to  ['DETOXI','HatEval','DETOXIS'] !!!!!!!!!!!!!!
-        
         # num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
         num_train_steps = int(len(self.data_dict[longer_dataset(self.data_dict)]['train']) / self.batch_size * config.EPOCHS)
         optimizer = AdamW(optimizer_parameters, lr=self.lr)
@@ -279,8 +277,6 @@ class CrossValidation(MetricTools, StatisticalTools):
             optimizer, num_warmup_steps=0, num_training_steps=num_train_steps
         )
         
-        #COMMENT: self.heads must to be splitted in group_heads and head
-        #COMMENT: the fuc must contain framework/model_name, group_heads and head - check logs
         # create obt for save preds class
         manage_preds = PredTools(self.data_dict,
                                 self.model_name, 
@@ -292,18 +288,13 @@ class CrossValidation(MetricTools, StatisticalTools):
                                 self.transformer)
         
         for epoch in range(1, config.EPOCHS+1):
-            #TODO: "self.heads" need to deliver "group_heads" e.g. "EXIST-DETOXIS-HatEval"
             # pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
             output_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
-            #TODO: modify "calculate_metrics" for the new input format
             # train_metrics = self.calculate_metrics(pred_train, targ_train)
             train_metrics = self.calculate_metrics(output_train)
             
-            
-            #TODO: "self.heads" need to deliver "group_heads" e.g. "EXIST-DETOXIS-HatEval"
             # pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device, self.heads)
             output_val = engine.eval_fn(val_data_loader, model, device, self.heads)
-            #TODO: modify "calculate_metrics" for the new input format
             # val_metrics = self.calculate_metrics(pred_val, targ_val)
             val_metrics = self.calculate_metrics(output_val)
             
@@ -311,8 +302,7 @@ class CrossValidation(MetricTools, StatisticalTools):
             # manage_preds.hold_epoch_preds(pred_val, targ_val, epoch)
             manage_preds.hold_epoch_preds(output_val, epoch)
             
-            #COMMENT: create/add the creation and fall filling the df_new_results
-            #TODO: the table below needs "model", "heads" and "data" as in the drive table
+            #COMMENT: move the code below to class/function
             list_new_results =[]
             for head in self.heads:
                 list_new_results.append(pd.DataFrame({'model':self.model_name,
@@ -360,9 +350,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         # avg and save logs
         if self.fold == config.SPLITS:
             self.df_results = super().avg_results(self.df_results)
-            #COMMENT: prepare and save table as on google drive - prepering code for MTL model
-            # self.df_results = super().add_me(self.heads, self.df_results, len(self.heads))
-            self.df_results = super().add_me(self.data_dict, self.heads, self.df_results)
+            self.df_results = super().add_margin_of_error(self.data_dict, self.heads, self.df_results)
             super().save_results(self.df_results)
             
             # save all folds preds "gridsearch"
@@ -383,13 +371,12 @@ if __name__ == "__main__":
     df_results = None
 
     #COMMENT: add feature layers encoder, feature layers decoder @
-    
     inter_parameters = len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
     inter_models =  len(config.MODELS.keys()) * math.prod([len(items['decoder']['heads']) for items in config.MODELS.values()])
     grid_search_bar = tqdm(total=(inter_parameters*inter_models), desc='GRID SEARCH', position=0)
 
     # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
-    #COMMENT: i may send everything "model_name, model_characteristics" together to "CrossValidation()"
+    #COMMENT: I should send everything "model_name, model_characteristics" together to "CrossValidation()"
     #COMMENT: related comment below
     for model_name, model_characteristics in config.MODELS.items():
         
@@ -422,13 +409,10 @@ if __name__ == "__main__":
                                         data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
                                         data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
                                         
-                                    #COMMENT: run must receice "data_dict" instead of data_dict[data]['train'] or data_dict[data]['val']***
                                     tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
                                     
-                                    #COMMENT: I shouldn't pass "head" or "data" to run function ***
-                                    #COMMENT: I may remove many input from run() func because I will send data_dict - adapting for MTL models***
                                     cv = CrossValidation(model_name, 
-                                                        group_heads, #COMMENT: I shouldn't pass "heads" to function I get it from data_dict
+                                                        group_heads, #COMMENT: I shouldn't pass "heads" to function I could get it from data_dict if I add it as first key to data_dict["EXIST-DETOXIS-HatEval"] @
                                                         data_dict, 
                                                         max_len, 
                                                         transformer, 
@@ -466,34 +450,18 @@ if __name__ == "__main__":
         #     8) add heads in the dataloader output[X]
         #     9) check model.py, engine.py and dataloader.py [DONE]
         #     10) Adapt new_grid_search for MTL - Dataset/DataLoader [DONE]
-        #     11) Adapt new_grid_search for MTL - remaining [ ]
-        #     12) 
+        #     11) Adapt new_grid_search for MTL - remaining [DONE]
+        #     12) Check adaptation of new_grid.py [DONE]
         
-
-
-
-            # df_new_results = pd.DataFrame({'model':self.model_name,
-            #                                 'data': self.heads, #COMMENT: add index for the dataset or dataset name directly [???]
-            #                                 'epoch':epoch,
-            #                                 'transformer':self.transformer,
-            #                                 'max_len':self.max_len,
-            #                                 'batch_size':self.batch_size,
-            #                                 'lr':self.lr,
-            #                                 'dropout':self.drop_out,
-            #                                 'accuracy_train':train_metrics['acc'],
-            #                                 'f1-score_train':train_metrics['f1'],
-            #                                 'recall_train':train_metrics['recall'],
-            #                                 'precision_train':train_metrics['precision'],
-            #                                 # 'loss_train':loss_train[],
-            #                                 'loss_train':output_train[],
-            #                                 'accuracy_val':val_metrics['acc'],
-            #                                 'me_accuracy_val':0,
-            #                                 'f1-score_val':val_metrics['f1'],
-            #                                 'me_f1-score_val':0,
-            #                                 'recall_val':val_metrics['recall'],
-            #                                 'me_recall_val':0,
-            #                                 'precision_val':val_metrics['precision'],
-            #                                 'me_precision_val':0,
-            #                                 'loss_val':loss_val
-            #                             }, index=[0]
-            #                 ) 
+        #     13) Run script and fix problems new_grid.py []
+                    # - print import output - add resuts, avg and so on
+                    # - check logs/tables
+                    # - printe model structure for
+                    # - check backpropagation
+                    
+        #     14) Break the script into utils.py and grid_search.py []
+        #     15) Move part of the run code to a new class or func[]
+        #     16) Double check utils.py and grid_search.py []
+        #     17) Run utils.py and grid_search.py []
+        #     18) Check the results from the experiment that I let running []
+        #     19) Run middle lgth test with the code adapted to MTL []
