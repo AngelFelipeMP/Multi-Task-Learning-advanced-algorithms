@@ -373,7 +373,7 @@ if __name__ == "__main__":
     grid_search_bar = tqdm(total=(inter_parameters*inter_models), desc='GRID SEARCH', position=0)
     
     # skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
-    skf = RepeatedStratifiedKFold(n_splits=config.SPLITS, n_repeats=int(inter_parameters/config.SPLITS), random_state=config.SEED)
+    # skf = RepeatedStratifiedKFold(n_splits=config.SPLITS, n_repeats=int(inter_parameters/config.SPLITS), random_state=config.SEED)
     df_results = None
 
     # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
@@ -393,7 +393,8 @@ if __name__ == "__main__":
                 data_dict[head] = {}
                 data_dict[head]['merge'] = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[head]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv', nrows=config.N_ROWS)
                 data_dict[head]['rows'] = data_dict[head]['merge'].shape[0]
-                data_dict[head]['data_split'] = skf.split(data_dict[head]['merge'][config.INFO_DATA[head]['text_col']], data_dict[head]['merge'][config.INFO_DATA[head]['label_col']])
+                data_dict[head]['skf'] = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
+                # data_dict[head]['data_split'] = skf.split(data_dict[head]['merge'][config.INFO_DATA[head]['text_col']], data_dict[head]['merge'][config.INFO_DATA[head]['label_col']])
             
             # grid search
             for transformer in config.TRANSFORMERS:
@@ -403,7 +404,8 @@ if __name__ == "__main__":
                             for lr in config.LR:
                                 
                                 # split data
-                                for fold, indexes in enumerate(zip(*[data_dict[d]['data_split'] for d in sorted(data_dict.keys())]), start=1):
+                                # for fold, indexes in enumerate(zip(*[data_dict[d]['data_split'] for d in sorted(data_dict.keys())]), start=1):
+                                for fold, indexes in enumerate(zip(*[data_dict[d]['skf'].split(data_dict[d]['merge'][config.INFO_DATA[d]['text_col']], data_dict[d]['merge'][config.INFO_DATA[d]['label_col']]) for d in sorted(data_dict.keys())]), start=1):
                                     
                                     for data, index in zip(sorted(data_dict.keys()), indexes):
                                         data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
@@ -457,8 +459,7 @@ if __name__ == "__main__":
         
         #     13) Run script and fix problems new_grid.py []
                     # - Run script and fix errors [X]
-                    
-                    # - check logs/tables --> Bug skf.split --> check logs -->
+                    # - check logs/tables --> Bug skf.split --> check logs --> [X]
                     
                     # - print import output - add resuts, avg and so on
                     # - printe model structure for
