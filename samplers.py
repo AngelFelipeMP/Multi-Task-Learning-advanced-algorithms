@@ -1,6 +1,6 @@
 import math
 import torch
-from torch.utils.data.sampler import RandomSampler
+from torch.utils.data.sampler import RandomSampler, SequentialSampler
 
 class BatchSamplerTrain(torch.utils.data.sampler.Sampler):
     """
@@ -84,7 +84,7 @@ class BatchSamplerValidation(torch.utils.data.sampler.Sampler):
             
             cur_dataset = self.dataset.datasets[dataset_idx]
             datasets_size.append(len(cur_dataset ))
-            sampler = RandomSampler(cur_dataset)
+            sampler = SequentialSampler(cur_dataset)
             samplers_list.append(sampler)
             cur_sampler_iterator = sampler.__iter__()
             sampler_iterators.append(cur_sampler_iterator)
