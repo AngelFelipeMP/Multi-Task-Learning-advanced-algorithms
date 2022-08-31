@@ -16,7 +16,7 @@ from samplers import BatchSamplerTrain, BatchSamplerValidation
 from model import MTLModels
 import warnings
 warnings.filterwarnings('ignore') 
-from sklearn.model_selection import StratifiedKFold, RepeatedStratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn import metrics
 from transformers import AdamW
 from transformers import get_linear_schedule_with_warmup
@@ -38,11 +38,11 @@ class StatisticalTools:
     
     # def add_me(self, data, df_results, rows):
     def add_margin_of_error(self, data_dict, heads, df_results):
-        last_row = -(len(heads)*config.EPOCHS)
+        last_rows = -(len(heads)*config.EPOCHS)
         
         for col in df_results.columns:
             if 'me_' in col:
-                df_results.loc[df_results.index[last_row]:, col] = df_results.loc[df_results.index[last_row]:, ['data', col[3:]]].apply(lambda x: self.ttest(x[col[3:]], data_dict[x['data']]['rows']),axis=1)
+                df_results.loc[df_results.index[last_rows]:, col] = df_results.loc[df_results.index[last_rows]:, ['data', col[3:]]].apply(lambda x: self.ttest(x[col[3:]], data_dict[x['data']]['rows']),axis=1)
         
         return df_results
 
@@ -52,7 +52,7 @@ class MetricTools:
     
     def create_df_results(self):
         return pd.DataFrame(columns=['model',
-                                        'heads'
+                                        'heads',
                                         'data',
                                         'epoch',
                                         'transformer',
@@ -173,7 +173,6 @@ def longer_dataset(data_dict):
         if data_dict[head]['rows'] > bigger:
             bigger = data_dict[head]['rows']
             dataset = head
-    
     return dataset
         
 
@@ -205,7 +204,7 @@ class CrossValidation(MetricTools, StatisticalTools):
             metrics_dict[head]['acc'] = metrics.accuracy_score(output_train[head]['targets'], output_train[head]['predictions'])
             metrics_dict[head]['recall'] = metrics.recall_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average) 
             metrics_dict[head]['precision'] = metrics.precision_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average)
-            
+        
         return metrics_dict
         
     def run(self):
@@ -227,7 +226,7 @@ class CrossValidation(MetricTools, StatisticalTools):
                 transformer=self.transformer
                 )
             )
-
+            
         # concat datasets
         concat_train = ConcatDataset(self.concat['train_datasets'])
         concat_val = ConcatDataset(self.concat['val_datasets'])
@@ -249,8 +248,8 @@ class CrossValidation(MetricTools, StatisticalTools):
         )
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # model = MTLModels(self.transformer, self.drop_out, number_of_classes=self.df_train[config.INFO_DATA[self.heads]['label_col']].max()+1)
-        model = MTLModels(self.transformer, self.drop_out, self.heads, number_of_classes=2)
+        # model = MTLModels(self.transformer, self.drop_out, self.heads, number_of_classes=2)
+        model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict)
         model.to(device)
         
         param_optimizer = list(model.named_parameters())
@@ -278,14 +277,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         )
         
         # create obt for save preds class
-        manage_preds = PredTools(self.data_dict,
-                                self.model_name, 
-                                self.heads,
-                                self.drop_out, 
-                                self.lr, 
-                                self.batch_size, 
-                                self.max_len, 
-                                self.transformer)
+        manage_preds = PredTools(self.data_dict, self.model_name, self.heads, self.drop_out, self.lr, self.batch_size, self.max_len, self.transformer)
         
         for epoch in range(1, config.EPOCHS+1):
             # pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
@@ -333,7 +325,7 @@ class CrossValidation(MetricTools, StatisticalTools):
                 )
             
             self.df_results = pd.concat([self.df_results, *list_new_results], ignore_index=True)
-            
+
             tqdm.write("Epoch {}/{}".format(epoch,config.EPOCHS))
             for head in self.heads:
                 tqdm.write("    Head: {:<8} f1-score_training = {:.3f}  accuracy_training = {:.3f}  loss_training = {:.3f} f1-score_val = {:.3f}  accuracy_val = {:.3f}  loss_val = {:.3f}".format(head,
@@ -373,7 +365,6 @@ if __name__ == "__main__":
     grid_search_bar = tqdm(total=(inter_parameters*inter_models), desc='GRID SEARCH', position=0)
     
     # skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
-    # skf = RepeatedStratifiedKFold(n_splits=config.SPLITS, n_repeats=int(inter_parameters/config.SPLITS), random_state=config.SEED)
     df_results = None
 
     # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
@@ -392,7 +383,8 @@ if __name__ == "__main__":
                 # load datasets & create StratifiedKFold splitter
                 data_dict[head] = {}
                 data_dict[head]['merge'] = pd.read_csv(config.DATA_PATH + '/' + str(config.INFO_DATA[head]['datasets']['train'].split('_')[0]) + '_merge' + '_processed.csv', nrows=config.N_ROWS)
-                data_dict[head]['rows'] = data_dict[head]['merge'].shape[0]
+                data_dict[head]['num_class'] = len(data_dict[head]['merge'][config.INFO_DATA[head]['label_col']].unique().tolist())
+                data_dict[head]['rows'] = data_dict[head]['merge'].shape[0] 
                 data_dict[head]['skf'] = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
                 # data_dict[head]['data_split'] = skf.split(data_dict[head]['merge'][config.INFO_DATA[head]['text_col']], data_dict[head]['merge'][config.INFO_DATA[head]['label_col']])
             
@@ -411,7 +403,7 @@ if __name__ == "__main__":
                                         data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
                                         data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
                                         
-                                    tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
+                                    tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Transformer: {transformer.split("/")[-1]} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
                                     
                                     cv = CrossValidation(model_name, 
                                                         group_heads, #COMMENT: I shouldn't pass "heads" to function I could get it from data_dict if I add it as first key to data_dict["EXIST-DETOXIS-HatEval"] @
@@ -427,9 +419,6 @@ if __name__ == "__main__":
                                     
                                     df_results = cv.run()
                                     grid_search_bar.update(1)
-                    
-                                    if fold == config.SPLITS:
-                                        break
 
 
 
@@ -460,10 +449,11 @@ if __name__ == "__main__":
         #     13) Run script and fix problems new_grid.py []
                     # - Run script and fix errors [X]
                     # - check logs/tables --> Bug skf.split --> check logs --> [X]
+                    # - print import output - add resuts, avg and so on [X]
                     
-                    # - print import output - add resuts, avg and so on
-                    # - printe model structure for
-                    # - check backpropagation
+                    # - check backpropagation []
+                    
+                    # remove unnecessary commented lines
                     
         #     14) Break the script into utils.py and grid_search.py []
         #     15) Move part of the run code to a new class or func[]
@@ -471,3 +461,6 @@ if __name__ == "__main__":
         #     17) Run utils.py and grid_search.py []
         #     18) Check the results from the experiment that I let running []
         #     19) Run middle lgth test with the code adapted to MTL []
+
+        # If I don't obtain the expected results
+        #     x1) Modify engine.py and model.py to be able to print model structure
