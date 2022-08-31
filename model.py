@@ -3,18 +3,20 @@ import torch.nn as nn
 from transformers import AutoModel, AutoConfig
 
 class MTLModels(nn.Module):
-    def __init__(self, transformer, drop_out, heads, number_of_classes):
+    # def __init__(self, transformer, drop_out, heads, number_of_classes):
+    def __init__(self, transformer, drop_out, heads, data_dict):
         super(MTLModels, self).__init__()
-        self.number_of_classes = number_of_classes
+        # self.number_of_classes = number_of_classes
+        self.data_dict = data_dict
         self.embedding_size = AutoConfig.from_pretrained(transformer).hidden_size
         self.transformer = AutoModel.from_pretrained(transformer)
         self.dropout = nn.Dropout(drop_out)
         self.heads = heads
         self.classifiers = dict()
         for head in self.heads:
-            # self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.number_of_classes[head]) #TODO: check to number of classes depend on the head/dataset
-            self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.number_of_classes)
-        
+            # self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.number_of_classes[head])
+            self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.data_dict[head]['num_class'])
+            
     def forward(self, iputs, head):
         transformer_output  = self.transformer(**iputs)
         mean_pool = torch.mean(transformer_output['last_hidden_state'], 1)
