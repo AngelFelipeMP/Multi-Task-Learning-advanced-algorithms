@@ -36,7 +36,6 @@ class StatisticalTools:
         standard_error = math.sqrt((value*(1-value))/n_sample)
         return round(z*standard_error,4) #margin_of_error
     
-    # def add_me(self, data, df_results, rows):
     def add_margin_of_error(self, data_dict, heads, df_results):
         last_rows = -(len(heads)*config.EPOCHS)
         
@@ -106,11 +105,9 @@ class MetricTools:
         
         
 class PredTools:
-    # def __init__(self, df_val, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
     def __init__(self, data_dict, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
         self.file_grid_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' +'.csv'
         self.file_fold_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' + '_fold' +'.csv'
-        # self.df_val = df_val
         self.data_dict = data_dict
         self.heads = heads
         self.list_df = []
@@ -178,16 +175,11 @@ def longer_dataset(data_dict):
 
 #COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it
 class CrossValidation(MetricTools, StatisticalTools):
-    # def __init__(self, df_train, df_val, model_name, heads, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
     def __init__(self, model_name, heads, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
         super(CrossValidation, self).__init__()
-        # self.df_train = df_train
-        # self.df_val = df_val
-        
         self.model_name = model_name
         self.data_dict = data_dict
-        self.heads = heads.split('-')
-        
+        self.heads = heads.split('-') #COMMENT: I may "zip(sorted(heads.split('-'))" to force the order
         self.max_len = max_len
         self.transformer = transformer
         self.batch_size = batch_size
@@ -196,7 +188,6 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.df_results = df_results if isinstance(df_results, pd.DataFrame) else super().create_df_results()
         self.fold = fold
         
-    # def calculate_metrics(self, pred, targ, pos_label=1, average='binary'):
     def calculate_metrics(self, output_train, pos_label=1, average='binary'):
         metrics_dict = {head:{} for head in self.heads}
         for head in self.heads:
@@ -248,7 +239,6 @@ class CrossValidation(MetricTools, StatisticalTools):
         )
         
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # model = MTLModels(self.transformer, self.drop_out, self.heads, number_of_classes=2)
         model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict)
         model.to(device)
         
@@ -269,7 +259,6 @@ class CrossValidation(MetricTools, StatisticalTools):
             },
         ]
 
-        # num_train_steps = int(len(self.df_train) / self.batch_size * config.EPOCHS)
         num_train_steps = int(len(self.data_dict[longer_dataset(self.data_dict)]['train']) / self.batch_size * config.EPOCHS)
         optimizer = AdamW(optimizer_parameters, lr=self.lr)
         scheduler = get_linear_schedule_with_warmup(
@@ -280,18 +269,13 @@ class CrossValidation(MetricTools, StatisticalTools):
         manage_preds = PredTools(self.data_dict, self.model_name, self.heads, self.drop_out, self.lr, self.batch_size, self.max_len, self.transformer)
         
         for epoch in range(1, config.EPOCHS+1):
-            # pred_train, targ_train, loss_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
             output_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
-            # train_metrics = self.calculate_metrics(pred_train, targ_train)
             train_metrics = self.calculate_metrics(output_train)
             
-            # pred_val, targ_val, loss_val = engine.eval_fn(val_data_loader, model, device, self.heads)
             output_val = engine.eval_fn(val_data_loader, model, device, self.heads)
-            # val_metrics = self.calculate_metrics(pred_val, targ_val)
             val_metrics = self.calculate_metrics(output_val)
             
             # save epoch preds
-            # manage_preds.hold_epoch_preds(pred_val, targ_val, epoch)
             manage_preds.hold_epoch_preds(output_val, epoch)
             
             #COMMENT: move the code below to class/function
@@ -364,7 +348,7 @@ if __name__ == "__main__":
     inter_models =  len(config.MODELS.keys()) * math.prod([len(items['decoder']['heads']) for items in config.MODELS.values()])
     grid_search_bar = tqdm(total=(inter_parameters*inter_models), desc='GRID SEARCH', position=0)
     
-    # skf = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
+    # metric results dataset
     df_results = None
 
     # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
@@ -386,7 +370,6 @@ if __name__ == "__main__":
                 data_dict[head]['num_class'] = len(data_dict[head]['merge'][config.INFO_DATA[head]['label_col']].unique().tolist())
                 data_dict[head]['rows'] = data_dict[head]['merge'].shape[0] 
                 data_dict[head]['skf'] = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
-                # data_dict[head]['data_split'] = skf.split(data_dict[head]['merge'][config.INFO_DATA[head]['text_col']], data_dict[head]['merge'][config.INFO_DATA[head]['label_col']])
             
             # grid search
             for transformer in config.TRANSFORMERS:
@@ -396,7 +379,6 @@ if __name__ == "__main__":
                             for lr in config.LR:
                                 
                                 # split data
-                                # for fold, indexes in enumerate(zip(*[data_dict[d]['data_split'] for d in sorted(data_dict.keys())]), start=1):
                                 for fold, indexes in enumerate(zip(*[data_dict[d]['skf'].split(data_dict[d]['merge'][config.INFO_DATA[d]['text_col']], data_dict[d]['merge'][config.INFO_DATA[d]['label_col']]) for d in sorted(data_dict.keys())]), start=1):
                                     
                                     for data, index in zip(sorted(data_dict.keys()), indexes):
@@ -450,10 +432,8 @@ if __name__ == "__main__":
                     # - Run script and fix errors [X]
                     # - check logs/tables --> Bug skf.split --> check logs --> [X]
                     # - print import output - add resuts, avg and so on [X]
-                    
-                    # - check backpropagation []
-                    
-                    # remove unnecessary commented lines
+                    # - check backpropagation [X]
+                    # remove unnecessary commented lines [X]
                     
         #     14) Break the script into utils.py and grid_search.py []
         #     15) Move part of the run code to a new class or func[]

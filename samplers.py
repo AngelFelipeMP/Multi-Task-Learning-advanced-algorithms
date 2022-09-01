@@ -10,7 +10,6 @@ class BatchSamplerTrain(torch.utils.data.sampler.Sampler):
         self.dataset = dataset
         self.batch_size = batch_size
         self.number_of_datasets = len(dataset.datasets)
-        # self.largest_dataset_size = max([len(cur_dataset.samples) for cur_dataset in dataset.datasets])
         self.largest_dataset_size = max([len(cur_dataset) for cur_dataset in dataset.datasets])
 
     def __len__(self):
@@ -66,7 +65,6 @@ class BatchSamplerValidation(torch.utils.data.sampler.Sampler):
         self.dataset = dataset
         self.batch_size = batch_size
         self.number_of_datasets = len(dataset.datasets)
-        # self.smallest_dataset_size = min([len(cur_dataset.samples) for cur_dataset in dataset.datasets])
         self.smallest_dataset_size = min([len(cur_dataset) for cur_dataset in dataset.datasets])
         self.interactions = math.ceil(self.smallest_dataset_size / self.batch_size)
 
