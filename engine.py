@@ -20,7 +20,6 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
             finds[head]['predictions'] = []
             finds[head]['loss'] = 0
             
-            
         batch = {k:v.to(device, dtype=torch.long) for k,v in batch.items()}
         targets = batch["targets"]
         del batch["targets"]
@@ -35,11 +34,12 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
         
         loss[head].backward()
         
-        if i+1 % len(heads) == 0:
+        if (i + 1) % len(heads) == 0:
             optimizer.step()
             scheduler.step()
             
     return finds
+
 
 def eval_fn(data_loader, model, device, heads):
     model.eval()
@@ -64,7 +64,7 @@ def eval_fn(data_loader, model, device, heads):
             finds[head]['targets'].extend(targets.cpu().detach().numpy().tolist())
             _, predictions = torch.max(outputs, 1)
             finds[head]['predictions'].extend(predictions.cpu().detach().numpy().tolist())
-        
+
     return finds
         
         
