@@ -95,7 +95,7 @@ class CrossValidation(MetricTools, StatisticalTools):
             num_workers=config.VAL_WORKERS
         )
         
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = config.DEVICE if config.DEVICE else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict)
         model.to(device)
         
@@ -269,7 +269,8 @@ if __name__ == "__main__":
         #     18) Check the results from the experiment that I let running [X]
         
         #     19) Run middle lgth test with the code adapted to MTL []
-
+                # - machine 2 GRIUs
+                # - STL & MTL separeted
 
 
 

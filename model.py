@@ -1,3 +1,4 @@
+import config
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig
@@ -12,7 +13,7 @@ class MTLModels(nn.Module):
         self.heads = heads
         self.classifiers = dict()
         for head in self.heads:
-            self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.data_dict[head]['num_class'])
+            self.classifiers[head] = nn.Linear(self.embedding_size * 2, self.data_dict[head]['num_class']).to(config.DEVICE)
             
     def forward(self, iputs, head):
         transformer_output  = self.transformer(**iputs)
