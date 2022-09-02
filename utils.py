@@ -1,7 +1,6 @@
 import os
 import re
 import pandas as pd
-import numpy as np
 import math
 import config
 from datetime import datetime
@@ -25,9 +24,46 @@ class StatisticalTools:
         return df_results
 
 class MetricTools:
-    def __init__(self):
-        pass
-    
+    def __init__(self, model_name, heads, transformer, max_len, batch_size, lr, drop_out, **kw):
+        self.model_name = model_name
+        self.heads = heads
+        self.transformer = transformer
+        self.max_len = max_len
+        self.batch_size = batch_size
+        self.lr = lr
+        self.drop_out = drop_out
+
+    def new_lines_df(self, epoch, train_metrics, output_train, val_metrics, output_val):
+        list_new_results = []
+        for head in self.heads:
+            list_new_results.append(pd.DataFrame({'model':self.model_name,
+                                            'heads':"-".join(self.heads),
+                                            'data': head,
+                                            'epoch':epoch,
+                                            'transformer':self.transformer,
+                                            'max_len':self.max_len,
+                                            'batch_size':self.batch_size,
+                                            'lr':self.lr,
+                                            'dropout':self.drop_out,
+                                            'accuracy_train':train_metrics[head]['acc'],
+                                            'f1-score_train':train_metrics[head]['f1'],
+                                            'recall_train':train_metrics[head]['recall'],
+                                            'precision_train':train_metrics[head]['precision'],
+                                            'loss_train':output_train[head]['loss'],
+                                            'accuracy_val':val_metrics[head]['acc'],
+                                            'me_accuracy_val':0,
+                                            'f1-score_val':val_metrics[head]['f1'],
+                                            'me_f1-score_val':0,
+                                            'recall_val':val_metrics[head]['recall'],
+                                            'me_recall_val':0,
+                                            'precision_val':val_metrics[head]['precision'],
+                                            'me_precision_val':0,
+                                            'loss_val':output_val[head]['loss'],
+                                        }, index=[0]
+                            )
+            )
+        return list_new_results
+
     def create_df_results(self):
         return pd.DataFrame(columns=['model',
                                         'heads',
@@ -133,9 +169,6 @@ class PredTools:
         if os.path.isfile(self.file_fold_preds):
             os.remove(self.file_fold_preds)
 
-#COMMENT: I my move "rename_logs()" and "longer_dataset(" to CrossValidation 
-#COMMENT: or I move the "calculate_metrics out of the Class"
-#COMMENT: I must follow a code standard 
 def rename_logs():
     time_str = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
     for file in os.listdir(config.LOGS_PATH):

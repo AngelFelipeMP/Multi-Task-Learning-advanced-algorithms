@@ -22,13 +22,13 @@ from transformers import logging
 logging.set_verbosity_error()
 
 
-#COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it
+#COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it@
 class CrossValidation(MetricTools, StatisticalTools):
     def __init__(self, model_name, heads, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
-        super(CrossValidation, self).__init__()
+        super(CrossValidation, self).__init__(model_name, heads, transformer, max_len, batch_size, lr, drop_out)
         self.model_name = model_name
         self.data_dict = data_dict
-        self.heads = heads.split('-') #COMMENT: I may "zip(sorted(heads.split('-'))" to force the order
+        self.heads = sorted(heads.split('-'))
         self.max_len = max_len
         self.transformer = transformer
         self.batch_size = batch_size
@@ -37,7 +37,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.df_results = df_results if isinstance(df_results, pd.DataFrame) else super().create_df_results()
         self.fold = fold
         
-    def calculate_metrics(self, output_train, pos_label=1, average='binary'):
+    def calculate_metrics(self, output_train, pos_label=1, average='micro'):
         metrics_dict = {head:{} for head in self.heads}
         for head in self.heads:
             metrics_dict[head]['f1'] = metrics.f1_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average)
@@ -135,36 +135,8 @@ class CrossValidation(MetricTools, StatisticalTools):
             # save epoch preds
             manage_preds.hold_epoch_preds(output_val, epoch)
             
-            #COMMENT: move the code below to class/function
-            list_new_results =[]
-            for head in self.heads:
-                list_new_results.append(pd.DataFrame({'model':self.model_name,
-                                                'heads':"-".join(self.heads),
-                                                'data': head,
-                                                'epoch':epoch,
-                                                'transformer':self.transformer,
-                                                'max_len':self.max_len,
-                                                'batch_size':self.batch_size,
-                                                'lr':self.lr,
-                                                'dropout':self.drop_out,
-                                                'accuracy_train':train_metrics[head]['acc'],
-                                                'f1-score_train':train_metrics[head]['f1'],
-                                                'recall_train':train_metrics[head]['recall'],
-                                                'precision_train':train_metrics[head]['precision'],
-                                                'loss_train':output_train[head]['loss'],
-                                                'accuracy_val':val_metrics[head]['acc'],
-                                                'me_accuracy_val':0,
-                                                'f1-score_val':val_metrics[head]['f1'],
-                                                'me_f1-score_val':0,
-                                                'recall_val':val_metrics[head]['recall'],
-                                                'me_recall_val':0,
-                                                'precision_val':val_metrics[head]['precision'],
-                                                'me_precision_val':0,
-                                                'loss_val':output_val[head]['loss'],
-                                            }, index=[0]
-                                )
-                )
-            
+            # create a list of dataframes with last caculated metrics and then add them to df_results
+            list_new_results = super().new_lines_df(epoch, train_metrics, output_train, val_metrics, output_val)
             self.df_results = pd.concat([self.df_results, *list_new_results], ignore_index=True)
 
             tqdm.write("Epoch {}/{}".format(epoch,config.EPOCHS))
@@ -209,8 +181,8 @@ if __name__ == "__main__":
     df_results = None
 
     # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
-    #COMMENT: I should send everything "model_name, model_characteristics" together to "CrossValidation()"
-    #COMMENT: related comment below
+    #COMMENT: I should send everything "model_name, model_characteristics" together to "CrossValidation()"@
+    #COMMENT: related comment below@
     for model_name, model_characteristics in config.MODELS.items():
         
         # start model -> get datasets/heads
@@ -219,7 +191,7 @@ if __name__ == "__main__":
             
             # Model script starts Here!
             data_dict = dict()
-            for head in group_heads.split('-'):
+            for head in sorted(group_heads.split('-')):
                 
                 # load datasets & create StratifiedKFold splitter
                 data_dict[head] = {}
@@ -284,21 +256,23 @@ if __name__ == "__main__":
         #     10) Adapt new_grid_search for MTL - Dataset/DataLoader [DONE]
         #     11) Adapt new_grid_search for MTL - remaining [DONE]
         #     12) Check adaptation of new_grid.py [DONE]
-        #     13) Run script and fix problems new_grid.py []
+        #     13) Run script and fix problems new_grid.py [X]
                     # - Run script and fix errors [X]
                     # - check logs/tables --> Bug skf.split --> check logs --> [X]
                     # - print import output - add resuts, avg and so on [X]
                     # - check backpropagation [X]
                     # remove unnecessary commented lines [X]
-                    
-        #     14) Break the script into utils.py and grid_search.py []
+        #     14) Break the script into utils.py and grid_search.py [X]
+        #     15) Move part of the run code to a new class or func[X]
+        #     16) Double check utils.py and grid_search.py [X]
+        #     17) Run utils.py and grid_search.py [X]
+        #     18) Check the results from the experiment that I let running [X]
         
-        
-        #     15) Move part of the run code to a new class or func[]
-        #     16) Double check utils.py and grid_search.py []
-        #     17) Run utils.py and grid_search.py []
-        #     18) Check the results from the experiment that I let running []
         #     19) Run middle lgth test with the code adapted to MTL []
+
+
+
+
 
         # If I don't obtain the expected results
         #     x1) Modify engine.py and model.py to be able to print model structure
