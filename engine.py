@@ -10,7 +10,16 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
     finds = {head:{} for head in heads}
     loss = {head:None for head in heads}
     
+    # print('@'*50)
+    # print('TRAINING')
+    # print(len(data_loader))
+    
     for i, (batch, head) in enumerate(zip(data_loader, cycle(heads)), start=0):
+        
+        # print('#'*50)
+        # print(head)
+        # print(len(batch))
+        # print(batch['targets'].shape)
         
         if i % len(heads) == 0:
             optimizer.zero_grad()
@@ -24,9 +33,14 @@ def train_fn(data_loader, model, optimizer, device, scheduler, heads):
         targets = batch["targets"]
         del batch["targets"]
         
+        # print('*'*50)
+        # print(targets)
+        # print(len(targets))
+        # print(len(data_loader)/len(heads))
+        
         outputs = model(batch, head)
         loss[head] = loss_fn(outputs, targets)
-        finds[head]['loss'] += loss[head].cpu().detach().numpy().tolist()/len(batch)
+        finds[head]['loss'] += (loss[head].cpu().detach().numpy().tolist()/(len(data_loader)/len(heads)))
         
         finds[head]['targets'].extend(targets.cpu().detach().numpy().tolist())
         _, predictions = torch.max(outputs, 1)
@@ -45,8 +59,17 @@ def eval_fn(data_loader, model, device, heads):
     model.eval()
     finds = {head:{} for head in heads}
     
+    # print('&&&&&&&&&& VALIDATION &&&&&&&&&&&')
+    # print(len(data_loader))
+    # print(len(heads))
+    
     with torch.no_grad():
         for i, (batch, head) in enumerate(zip(data_loader, cycle(heads)), start=0):
+            
+            # print('#'*50)
+            # print(head)
+            # print(len(batch))
+            # print(batch['targets'].shape)
             
             if i < len(heads):
                 finds[head]['targets'] = []
@@ -56,10 +79,15 @@ def eval_fn(data_loader, model, device, heads):
             batch = {k:v.to(device, dtype=torch.long) for k,v in batch.items()}
             targets = batch["targets"]
             del batch["targets"]
+            
+            # print('*'*50)
+            # print(targets)
+            # print(len(targets))
+            # print(len(data_loader)/len(heads))
 
             outputs = model(batch, head)
             loss = loss_fn(outputs, targets)
-            finds[head]['loss'] += loss.cpu().detach().numpy().tolist()/len(batch)
+            finds[head]['loss'] += (loss.cpu().detach().numpy().tolist()/(len(data_loader)/len(heads)))
             
             finds[head]['targets'].extend(targets.cpu().detach().numpy().tolist())
             _, predictions = torch.max(outputs, 1)
