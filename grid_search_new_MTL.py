@@ -55,20 +55,27 @@ class CrossValidation(MetricTools, StatisticalTools):
                 dataset = head
         return dataset
         
+    def task_text_input(self, head, step):
+        if 'task-identification-text' in config.MODELS[self.model_name]['encoder']['input']:
+            return self.data_dict[head][step]['task'].values
+        else:
+            return None
+        
     def run(self):
         self.concat = {'train_datasets':[], 'val_datasets':[]}
         # loading datasets
         for head in self.heads:
             self.concat['train_datasets'].append(dataset.TransformerDataset(
                 text=self.data_dict[head]['train'][config.INFO_DATA[head]['text_col']].values,
+                text_par= self.task_text_input(head, 'train'),
                 target=self.data_dict[head]['train'][config.INFO_DATA[head]['label_col']].values,
                 max_len=self.max_len,
                 transformer=self.transformer
                 )
             )
-            
             self.concat['val_datasets'].append(dataset.TransformerDataset(
                 text=self.data_dict[head]['val'][config.INFO_DATA[head]['text_col']].values,
+                text_par= self.task_text_input(head, 'val'),
                 target=self.data_dict[head]['val'][config.INFO_DATA[head]['label_col']].values,
                 max_len=self.max_len,
                 transformer=self.transformer
