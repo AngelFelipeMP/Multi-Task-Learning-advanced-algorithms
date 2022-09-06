@@ -69,7 +69,8 @@ class BatchSamplerValidation(torch.utils.data.sampler.Sampler):
         self.interactions = math.ceil(self.smallest_dataset_size / self.batch_size)
 
     def __len__(self):
-        return self.batch_size * math.ceil(self.smallest_dataset_size / self.batch_size) * len(self.dataset.datasets)
+        # return self.batch_size * math.ceil(self.smallest_dataset_size / self.batch_size) * len(self.dataset.datasets)
+        return math.ceil(self.smallest_dataset_size / self.batch_size) * len(self.dataset.datasets)
 
     def __iter__(self):
         samplers_list = []
@@ -83,6 +84,7 @@ class BatchSamplerValidation(torch.utils.data.sampler.Sampler):
             cur_dataset = self.dataset.datasets[dataset_idx]
             datasets_size.append(len(cur_dataset ))
             sampler = SequentialSampler(cur_dataset)
+            # sampler = RandomSampler(cur_dataset) #TODO: check if it is possible to use random
             samplers_list.append(sampler)
             cur_sampler_iterator = sampler.__iter__()
             sampler_iterators.append(cur_sampler_iterator)
