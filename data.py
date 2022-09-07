@@ -106,7 +106,12 @@ class DataProcessClass:
                 
                 else:
                     df = pd.concat(merge_list, ignore_index=True)
+                    
                 
+                # remove duplicate instances
+                df.drop_duplicates(INFO_DATA[data]['text_col'], inplace=True)
+                
+                # save merged dataset
                 df.to_csv(DATA_PATH + '/' + file.split('_')[0] + '_merge' + '_processed.csv', index=False)
                 print('\nMerged file for data: {}'.format(data))
 

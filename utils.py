@@ -161,6 +161,7 @@ class PredTools:
         if os.path.isfile(self.file_grid_preds):
             df_grid_preds = pd.read_csv(self.file_grid_preds)
             self.df_fold_preds = pd.merge(df_grid_preds, self.df_fold_preds, on=['text','target'], how='outer')
+            # self.df_fold_preds = pd.concat([df_grid_preds, self.df_fold_preds.loc[:, (self.df_fold_preds.columns != "text") & (self.df_fold_preds.columns != "target")]], axis=1)
             
         # save grid preds
         self.df_fold_preds.to_csv(self.file_grid_preds, index=False)
