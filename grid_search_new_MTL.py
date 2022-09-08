@@ -37,13 +37,19 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.df_results = df_results if isinstance(df_results, pd.DataFrame) else super().create_df_results()
         self.fold = fold
         
-    def calculate_metrics(self, output_train, pos_label=1, average='micro'):
+    # def calculate_metrics(self, output_train, pos_label=1, average='micro'):
+    def calculate_metrics(self, output_train, average='macro'):
         metrics_dict = {head:{} for head in self.heads}
         for head in self.heads:
-            metrics_dict[head]['f1'] = metrics.f1_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average)
+            # macro average
+            metrics_dict[head]['f1'] = metrics.f1_score(output_train[head]['targets'], output_train[head]['predictions'], average=average)
             metrics_dict[head]['acc'] = metrics.accuracy_score(output_train[head]['targets'], output_train[head]['predictions'])
-            metrics_dict[head]['recall'] = metrics.recall_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average) 
-            metrics_dict[head]['precision'] = metrics.precision_score(output_train[head]['targets'], output_train[head]['predictions'], pos_label=pos_label, average=average)
+            metrics_dict[head]['recall'] = metrics.recall_score(output_train[head]['targets'], output_train[head]['predictions'], average=average) 
+            metrics_dict[head]['precision'] = metrics.precision_score(output_train[head]['targets'], output_train[head]['predictions'], average=average)
+            
+            metrics_dict[head]['f1_weighted'] = metrics.f1_score(output_train[head]['targets'], output_train[head]['predictions'], average='weighted')
+            metrics_dict[head]['recall_weighted'] = metrics.recall_score(output_train[head]['targets'], output_train[head]['predictions'], average='weighted') 
+            metrics_dict[head]['precision_weighted'] = metrics.precision_score(output_train[head]['targets'], output_train[head]['predictions'], average='weighted')
         
         return metrics_dict
     
