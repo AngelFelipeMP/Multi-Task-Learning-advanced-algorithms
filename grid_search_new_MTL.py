@@ -24,7 +24,7 @@ logging.set_verbosity_error()
 
 #COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it@
 class CrossValidation(MetricTools, StatisticalTools):
-    def __init__(self, model_name, heads, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold):
+    def __init__(self, model_name, heads, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold, num_efl, num_dfl):
         super(CrossValidation, self).__init__(model_name, heads, transformer, max_len, batch_size, lr, drop_out)
         self.model_name = model_name
         self.data_dict = data_dict
@@ -36,6 +36,8 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.lr = lr
         self.df_results = df_results if isinstance(df_results, pd.DataFrame) else super().create_df_results()
         self.fold = fold
+        self.num_efl = num_efl
+        self.num_dfl = num_dfl
         
     # def calculate_metrics(self, output_train, pos_label=1, average='micro'):
     def calculate_metrics(self, output_train, average='macro'):
@@ -109,7 +111,9 @@ class CrossValidation(MetricTools, StatisticalTools):
         )
         
         device = config.DEVICE if config.DEVICE else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict)
+        #TODO: check it for the MTL1
+        # model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict)
+        model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict, self.model_name, self.num_efl, self.num_dfl) 
         model.to(device)
         
         param_optimizer = list(model.named_parameters())
@@ -214,32 +218,49 @@ if __name__ == "__main__":
                 data_dict[head]['skf'] = StratifiedKFold(n_splits=config.SPLITS, shuffle=True, random_state=config.SEED)
             
             # grid search
-            for transformer in config.TRANSFORMERS:
-                for max_len in config.MAX_LEN:
-                    for batch_size in config.BATCH_SIZE:
-                        for drop_out in config.DROPOUT:
-                            for lr in config.LR:
-                                
-                                # split data
-                                for fold, indexes in enumerate(zip(*[data_dict[d]['skf'].split(data_dict[d]['merge'][config.INFO_DATA[d]['text_col']], data_dict[d]['merge'][config.INFO_DATA[d]['label_col']]) for d in sorted(data_dict.keys())]), start=1):
-                                    
-                                    for data, index in zip(sorted(data_dict.keys()), indexes):
-                                        data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
-                                        data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
+            for num_efl in parameters(model_name)['task-identification-vector']:
+                for num_dfl in parameters(model_name)['deep-classifier']:
+                    for transformer in config.TRANSFORMERS:
+                        for max_len in config.MAX_LEN:
+                            for batch_size in config.BATCH_SIZE:
+                                for drop_out in config.DROPOUT:
+                                    for lr in config.LR:
                                         
-                                    tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Transformer: {transformer.split("/")[-1]} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
-                                    
-                                    cv = CrossValidation(model_name, 
-                                                        group_heads, #COMMENT: I shouldn't pass "heads" to function I could get it from data_dict if I add it as first key to data_dict["EXIST-DETOXIS-HatEval"] @
-                                                        data_dict, 
-                                                        max_len, 
-                                                        transformer, 
-                                                        batch_size, 
-                                                        drop_out,
-                                                        lr,
-                                                        df_results,
-                                                        fold
-                                    )
-                                    
-                                    df_results = cv.run()
-                                    grid_search_bar.update(1)
+                                        # split data
+                                        for fold, indexes in enumerate(zip(*[data_dict[d]['skf'].split(data_dict[d]['merge'][config.INFO_DATA[d]['text_col']], data_dict[d]['merge'][config.INFO_DATA[d]['label_col']]) for d in sorted(data_dict.keys())]), start=1):
+                                            
+                                            for data, index in zip(sorted(data_dict.keys()), indexes):
+                                                data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
+                                                data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
+                                                
+                                            tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Transformer: {transformer.split("/")[-1]} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
+                                            
+                                            cv = CrossValidation(model_name, 
+                                                                group_heads, #COMMENT: I shouldn't pass "heads" to function I could get it from data_dict if I add it as first key to data_dict["EXIST-DETOXIS-HatEval"] @
+                                                                data_dict, 
+                                                                max_len, 
+                                                                transformer, 
+                                                                batch_size, 
+                                                                drop_out,
+                                                                lr,
+                                                                df_results,
+                                                                fold,
+                                                                num_efl,
+                                                                num_dfl
+                                            )
+                                            
+                                            df_results = cv.run()
+                                            grid_search_bar.update(1)
+                                            
+                                            
+                                            
+            #     # condition to use 'task-identification-vector' AND/OR 'deep-classifier'
+            # if 'task-identification-vector' in config.MODELS[model_name]['encoder']['input']:
+            #     list_efl = config.ENCODER_FEATURE_LAYERS
+            # else:
+            #     list_efl = [0]
+            
+            # if 'deep-classifier' in config.MODELS[model_name]['decoder']['model']:
+            #     list_dfl = config.DECODER_FEATURE_LAYERS 
+            # else:
+            #     list_dfl = [0]

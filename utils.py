@@ -74,31 +74,6 @@ class MetricTools:
         return list_new_results
 
     def create_df_results(self):
-        # return pd.DataFrame(columns=['model',
-        #                                 'heads',
-        #                                 'data',
-        #                                 'epoch',
-        #                                 'transformer',
-        #                                 'max_len',
-        #                                 'batch_size',
-        #                                 'lr',
-        #                                 'dropout',
-        #                                 'accuracy_train',
-        #                                 'f1-score_train',
-        #                                 'recall_train',
-        #                                 'precision_train',
-        #                                 'loss_train',
-        #                                 'accuracy_val',
-        #                                 'me_accuracy_val',
-        #                                 'f1-score_val',
-        #                                 'me_f1-score_val',
-        #                                 'recall_val',
-        #                                 'me_recall_val',
-        #                                 'precision_val',
-        #                                 'me_precision_val',
-        #                                 'loss_val'
-        #                             ]
-        #             )
         return pd.DataFrame(columns=['model',
                                 'heads',
                                 'data',
@@ -135,28 +110,6 @@ class MetricTools:
             )
         
     def avg_results(self, df):
-        # return df.groupby(['model',
-        #                     'heads',
-        #                     'data',
-        #                     'epoch',
-        #                     'transformer',
-        #                     'max_len',
-        #                     'batch_size',
-        #                     'lr',
-        #                     'dropout'], as_index=False, sort=False)['accuracy_train',
-        #                                                             'f1-score_train',
-        #                                                             'recall_train',
-        #                                                             'precision_train',
-        #                                                             'loss_train',
-        #                                                             'accuracy_val',
-        #                                                             'me_accuracy_val',
-        #                                                             'f1-score_val',
-        #                                                             'me_f1-score_val',
-        #                                                             'recall_val',
-        #                                                             'me_recall_val',
-        #                                                             'precision_val',
-        #                                                             'me_precision_val',
-        #                                                             'loss_val'].mean()
         return df.groupby(['model',
                         'heads',
                         'data',
@@ -250,4 +203,14 @@ def rename_logs():
         if not bool(re.search(r'\d', file)):
             os.rename(config.LOGS_PATH + '/' + file, config.LOGS_PATH + '/' + file[:-4] + '_' + time_str + file[-4:])
             
+
+def parameters(model_name):
+    parameters_dict = {'task-identification-vector':[0], 'deep-classifier':[0]}
+    
+    if 'task-identification-vector' in config.MODELS[model_name]['encoder']['input']:
+        parameters_dict['task-identification-vector'] = config.ENCODER_FEATURE_LAYERS
+
+    if 'deep-classifier' in config.MODELS[model_name]['decoder']['model']:
+        parameters_dict['deep-classifier'] = config.DECODER_FEATURE_LAYERS
         
+    return parameters_dict
