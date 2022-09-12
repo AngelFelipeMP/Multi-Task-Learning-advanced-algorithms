@@ -25,7 +25,7 @@ logging.set_verbosity_error()
 #COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it@
 class CrossValidation(MetricTools, StatisticalTools):
     def __init__(self, model_name, heads, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold, num_efl, num_dfl):
-        super(CrossValidation, self).__init__(model_name, heads, transformer, max_len, batch_size, lr, drop_out)
+        super(CrossValidation, self).__init__(model_name, heads, transformer, max_len, batch_size, lr, drop_out, num_efl, num_dfl)
         self.model_name = model_name
         self.data_dict = data_dict
         self.heads = sorted(heads.split('-'))
@@ -39,7 +39,6 @@ class CrossValidation(MetricTools, StatisticalTools):
         self.num_efl = num_efl
         self.num_dfl = num_dfl
         
-    # def calculate_metrics(self, output_train, pos_label=1, average='micro'):
     def calculate_metrics(self, output_train, average='macro'):
         metrics_dict = {head:{} for head in self.heads}
         for head in self.heads:
@@ -111,8 +110,6 @@ class CrossValidation(MetricTools, StatisticalTools):
         )
         
         device = config.DEVICE if config.DEVICE else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        #TODO: check it for the MTL1
-        # model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict)
         model = MTLModels(self.transformer, self.drop_out, self.heads, self.data_dict, self.model_name, self.num_efl, self.num_dfl) 
         model.to(device)
         
@@ -140,7 +137,7 @@ class CrossValidation(MetricTools, StatisticalTools):
         )
         
         # create obt for save preds class
-        manage_preds = PredTools(self.data_dict, self.model_name, self.heads, self.drop_out, self.lr, self.batch_size, self.max_len, self.transformer)
+        manage_preds = PredTools(self.data_dict, self.model_name, self.heads, self.drop_out, self.num_efl, self.num_dfl, self.lr, self.batch_size, self.max_len, self.transformer)
         
         for epoch in range(1, config.EPOCHS+1):
             output_train = engine.train_fn(train_data_loader, model, optimizer, device, scheduler, self.heads)
@@ -253,6 +250,12 @@ if __name__ == "__main__":
                                             grid_search_bar.update(1)
                                             
                                             
+            
+            #TODO: FIX tqdm
+            #TODO: add/ prints epochs/models
+            #TODO: clean the code
+            
+            
                                             
             #     # condition to use 'task-identification-vector' AND/OR 'deep-classifier'
             # if 'task-identification-vector' in config.MODELS[model_name]['encoder']['input']:

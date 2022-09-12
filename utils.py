@@ -24,7 +24,7 @@ class StatisticalTools:
         return df_results
 
 class MetricTools:
-    def __init__(self, model_name, heads, transformer, max_len, batch_size, lr, drop_out, **kw):
+    def __init__(self, model_name, heads, transformer, max_len, batch_size, lr, drop_out, num_efl, num_dfl, **kw):
         self.model_name = model_name
         self.heads = heads
         self.transformer = transformer
@@ -32,6 +32,8 @@ class MetricTools:
         self.batch_size = batch_size
         self.lr = lr
         self.drop_out = drop_out
+        self.num_efl = num_efl
+        self.num_dfl = num_dfl
 
     def new_lines_df(self, epoch, train_metrics, output_train, val_metrics, output_val):
         list_new_results = []
@@ -45,6 +47,8 @@ class MetricTools:
                                             'batch_size':self.batch_size,
                                             'lr':self.lr,
                                             'dropout':self.drop_out,
+                                            'encoder-feature-layers':self.num_efl,
+                                            'decoder-feature-layers':self.num_dfl,
                                             'accuracy_train':train_metrics[head]['acc'],
                                             'f1_train':train_metrics[head]['f1'],
                                             'recall_train':train_metrics[head]['recall'],
@@ -73,6 +77,7 @@ class MetricTools:
             )
         return list_new_results
 
+
     def create_df_results(self):
         return pd.DataFrame(columns=['model',
                                 'heads',
@@ -83,6 +88,8 @@ class MetricTools:
                                 'batch_size',
                                 'lr',
                                 'dropout',
+                                'encoder-feature-layers',
+                                'decoder-feature-layers',
                                 'accuracy_train',
                                 'f1_train',
                                 'recall_train',
@@ -109,8 +116,10 @@ class MetricTools:
                             ]
             )
         
+
     def avg_results(self, df):
-        return df.groupby(['model',
+        return df.groupby([
+                        'model',
                         'heads',
                         'data',
                         'epoch',
@@ -118,7 +127,10 @@ class MetricTools:
                         'max_len',
                         'batch_size',
                         'lr',
-                        'dropout'], as_index=False, sort=False)['accuracy_train',
+                        'dropout',
+                        'encoder-feature-layers',
+                        'decoder-feature-layers'
+                        ], as_index=False, sort=False)['accuracy_train',
                                                                 'f1_train',
                                                                 'recall_train',
                                                                 'precision_train',
@@ -147,7 +159,7 @@ class MetricTools:
         
         
 class PredTools:
-    def __init__(self, data_dict, model_name, heads, drop_out, lr, batch_size, max_len, transformer):
+    def __init__(self, data_dict, model_name, heads, drop_out, num_efl, num_dfl, lr ,batch_size, max_len, transformer):
         self.file_grid_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' +'.csv'
         self.file_fold_preds = config.LOGS_PATH + '/' + config.DOMAIN_GRID_SEARCH + '_predictions' + '_fold' +'.csv'
         self.data_dict = data_dict
@@ -155,15 +167,18 @@ class PredTools:
         self.list_df = []
         self.model_name = model_name
         self.drop_out = drop_out
+        self.num_efl = num_efl
+        self.num_dfl = num_dfl
         self.lr = lr
         self.batch_size = batch_size
         self.max_len = max_len
         self.transformer = transformer
+
     
     def hold_epoch_preds(self, output_val, epoch):
         for index, head in enumerate(self.heads):
             # pred columns name
-            pred_col = self.model_name + '_' + "-".join(self.heads) + '_' + head + '_' + str(self.drop_out) + '_' + str(self.lr) + '_' + str(self.batch_size) + '_' + str(self.max_len) + '_' + self.transformer + '_' + str(epoch)
+            pred_col = self.model_name + '_' + "-".join(self.heads) + '_' + head + '_' + str(self.drop_out) + '_' + str(self.num_efl) + '_' + str(self.num_dfl) + '_' + str(self.lr) + '_' + str(self.batch_size) + '_' + str(self.max_len) + '_' + self.transformer + '_' + str(epoch)
             
             if epoch == 1:
                 self.list_df.append(pd.DataFrame({'text':self.data_dict[head]['val'][config.INFO_DATA[head]['text_col']].values,
