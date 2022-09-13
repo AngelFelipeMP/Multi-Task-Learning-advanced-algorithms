@@ -1,3 +1,4 @@
+from json import decoder
 import dataset
 import engine
 import torch
@@ -22,7 +23,6 @@ from transformers import logging
 logging.set_verbosity_error()
 
 
-#COMMENT: the CrossValidation need to receive model_characteristics because super().save_preds() needs it@
 class CrossValidation(MetricTools, StatisticalTools):
     def __init__(self, model_name, heads, data_dict, max_len, transformer, batch_size, drop_out, lr, df_results, fold, num_efl, num_dfl):
         super(CrossValidation, self).__init__(model_name, heads, transformer, max_len, batch_size, lr, drop_out, num_efl, num_dfl)
@@ -186,21 +186,16 @@ if __name__ == "__main__":
     #rename old log files adding date YMD-HMS
     rename_logs()
 
-    #COMMENT: add feature layers encoder, feature layers decoder @
-    inter_parameters = len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS
-    inter_models =  len(config.MODELS.keys()) * math.prod([len(items['decoder']['heads']) for items in config.MODELS.values()])
-    grid_search_bar = tqdm(total=(inter_parameters*inter_models), desc='GRID SEARCH', position=0)
-    
+    # create progress bar
+    grid_search_bar = tqdm(total=tdqm_gridsearch(), desc='GRID SEARCH', position=0)
+
     # metric results dataset
     df_results = None
 
     # get model_name/framework_name such as 'STL', 'MTL0' and etc & parameters
-    #COMMENT: I should send everything "model_name, model_characteristics" together to "CrossValidation()"@
-    #COMMENT: related comment below@
     for model_name, model_characteristics in config.MODELS.items():
         
         # start model -> get datasets/heads
-        #COMMENT: Here I can get the other models characteristics for the MTL models @
         for group_heads in model_characteristics['decoder']['heads']:
             
             # Model script starts Here!
@@ -230,10 +225,10 @@ if __name__ == "__main__":
                                                 data_dict[data]['train'] = data_dict[data]['merge'].loc[index[0]]
                                                 data_dict[data]['val'] = data_dict[data]['merge'].loc[index[1]]
                                                 
-                                            tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Transformer: {transformer.split("/")[-1]} Max_len: {max_len} Batch_size: {batch_size} Dropout: {drop_out} lr: {lr} Fold: {fold}/{config.SPLITS}')
+                                            tqdm.write(f'\nModel: {model_name} Heads: {group_heads} Encode-feature-layers: {num_efl} Decoder-feature-layers: {num_dfl} Dropout: {drop_out} lr: {lr} Max_len: {max_len} Batch_size: {batch_size} Fold: {fold}/{config.SPLITS}')
                                             
                                             cv = CrossValidation(model_name, 
-                                                                group_heads, #COMMENT: I shouldn't pass "heads" to function I could get it from data_dict if I add it as first key to data_dict["EXIST-DETOXIS-HatEval"] @
+                                                                group_heads,
                                                                 data_dict, 
                                                                 max_len, 
                                                                 transformer, 
@@ -249,21 +244,3 @@ if __name__ == "__main__":
                                             df_results = cv.run()
                                             grid_search_bar.update(1)
                                             
-                                            
-            
-            #TODO: FIX tqdm
-            #TODO: add/ prints epochs/models
-            #TODO: clean the code
-            
-            
-                                            
-            #     # condition to use 'task-identification-vector' AND/OR 'deep-classifier'
-            # if 'task-identification-vector' in config.MODELS[model_name]['encoder']['input']:
-            #     list_efl = config.ENCODER_FEATURE_LAYERS
-            # else:
-            #     list_efl = [0]
-            
-            # if 'deep-classifier' in config.MODELS[model_name]['decoder']['model']:
-            #     list_dfl = config.DECODER_FEATURE_LAYERS 
-            # else:
-            #     list_dfl = [0]

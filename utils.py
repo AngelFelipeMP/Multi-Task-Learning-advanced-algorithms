@@ -229,3 +229,15 @@ def parameters(model_name):
         parameters_dict['deep-classifier'] = config.DECODER_FEATURE_LAYERS
         
     return parameters_dict
+
+
+def tdqm_gridsearch():
+    tqdm_list=[]
+    
+    for model in config.MODELS.keys():
+        x = len(parameters(model)['task-identification-vector'])
+        y = len(parameters(model)['deep-classifier'])
+        param = len(config.TRANSFORMERS) * len(config.MAX_LEN) * len(config.BATCH_SIZE) * len(config.DROPOUT) * len(config.LR) * config.SPLITS * x * y * len(config.MODELS[model]['decoder']['heads'])
+        tqdm_list.append(param)
+    
+    return sum(tqdm_list)
