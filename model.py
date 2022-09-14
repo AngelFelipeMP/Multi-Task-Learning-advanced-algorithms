@@ -42,7 +42,7 @@ class MTLModels(nn.Module):
         if ('task-identification-vector' in config.MODELS[self.model_name]['encoder']['input']) & (self.num_efl > 0):
             task_ident_vector = [0] * len(self.heads)
             task_ident_vector[self.heads.index(head)] = 1
-            task_ident_vector = torch.tensor([task_ident_vector] * out.shape[0], dtype=torch.long)
+            task_ident_vector = torch.tensor([task_ident_vector] * out.shape[0], dtype=torch.long).to(config.DEVICE)
             out = torch.cat((out,task_ident_vector), 1)
             for layer in self.encoder_feature_layers:
                 out = layer(out)
