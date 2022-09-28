@@ -241,3 +241,14 @@ def tdqm_gridsearch():
         tqdm_list.append(param)
     
     return sum(tqdm_list)
+
+
+def order(my_list):
+    order_dict={}
+    for item in my_list:
+        if re.search(r'\d', item):
+            order_dict[int(re.findall(r'\d+', item)[0]) + 1] = item
+        else:
+            order_dict[0] = item
+            
+    return [order_dict[num] for num in range(len(order_dict))]
