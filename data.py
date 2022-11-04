@@ -19,6 +19,7 @@ class DataProcessClass:
             self.check_files()
             self.process_data()
             self.merge_data()
+            self.sanitization()
         
     
     def download_data(self):
@@ -114,6 +115,17 @@ class DataProcessClass:
                 # save merged dataset
                 df.to_csv(DATA_PATH + '/' + file.split('_')[0] + '_merge' + '_processed.csv', index=False)
                 print('\nMerged file for data: {}'.format(data))
+
+
+    def sanitization(self):
+        # add a space ad the end of test deduplicate samples
+        for task in INFO_DATA.keys():
+    
+            df  = pd.read_csv(DATA_PATH + '/' + str(INFO_DATA[task]['datasets']['test'].split('.')[0]) + '_processed.csv')
+            rows = df.duplicated(subset=[INFO_DATA[task]['text_col']], keep='first')
+            df.loc[rows, INFO_DATA[task]['text_col']] += (df.loc[rows, INFO_DATA[task]['text_col']] + ' ')
+            df.to_csv(DATA_PATH + '/' + str(INFO_DATA[task]['datasets']['test'].split('.')[0]) + '_processed.csv', index=False)
+
 
 if __name__ == "__main__":
     DataProcessClass()
