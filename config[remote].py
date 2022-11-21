@@ -1,17 +1,17 @@
 import os
 
 #Hiper-parameters
-SPLITS = 2 #5
-EPOCHS = 2 #15
-MAX_LEN = [64] #[128]
-DROPOUT = [0.2] #[0.2, 0.3, 0.4]
-LR = [5e-4] #[5e-6, 1e-5, 5e-5, 1e-4]
-BATCH_SIZE = [32] #[32]
+SPLITS = 5
+EPOCHS = 15
+MAX_LEN = [128]
+DROPOUT = [0.3]
+LR = [5e-6, 1e-5, 5e-5, 1e-4]
+BATCH_SIZE = [64]
 TRANSFORMERS = ['dccuchile/bert-base-spanish-wwm-cased']
-ENCODER_FEATURE_LAYERS = [1,2] #[1,2,3]
+ENCODER_FEATURE_LAYERS = [1,2,3] #[0]
 DECODER_FEATURE_LAYERS = [0]
 
-N_ROWS= 64 #None
+N_ROWS= None
 SEED = 17
 CODE_PATH = os.getcwd()
 REPO_PATH = '/'.join(CODE_PATH.split('/')[0:-1])
@@ -22,7 +22,7 @@ RESULTS_PATH = REPO_PATH + '/' + 'results'
 TARGET_LANGUAGE = 'es'
 DOWLOAD_DATA = False
 PROCESS_DATA = True
-DEVICE = 'cpu' # DEVICE = 0 #DEVICE = 'cuda:1'
+DEVICE = 'cuda:0'
 
 DOMAIN_GRID_SEARCH = 'gridsearch'
 DOMAIN_TRAIN = 'training'
@@ -79,10 +79,18 @@ MODELS = {
         'MTL1': {
             'decoder': {
                 'model':'classifier',
-                'heads':['EXIST-DETOXIS', 'EXIST-HatEval']},
+                'heads':['EXIST-DETOXIS', 'EXIST-HatEval','DETOXIS-HatEval', 'EXIST-DETOXIS-HatEval']},
             'encoder': {
                 'model':'transformer',
                 'input':['text', 'task-identification-text']}
+            },
+        'MTL2': {
+            'decoder': {
+                'model':'classifier',
+                'heads':['EXIST-DETOXIS', 'EXIST-HatEval','DETOXIS-HatEval', 'EXIST-DETOXIS-HatEval']},
+            'encoder': {
+                'model':'task-identification-encoder', 
+                'input':['text', 'task-identification-vector']}
             }
         }
 
@@ -91,18 +99,10 @@ MODELS = {
 #         'MTL1': {
 #             'decoder': {
 #                 'model':'classifier',
-#                 'heads':['EXIST-DETOXIS', 'EXIST-HatEval','DETOXIS-HatEval', 'EXIST-DETOXIS-HatEval']},
+#                 'heads':['EXIST-DETOXIS', 'EXIST-HatEval']},
 #             'encoder': {
 #                 'model':'transformer',
 #                 'input':['text', 'task-identification-text']}
-#             },
-#         'MTL2': {
-#             'decoder': {
-#                 'model':'classifier',
-#                 'heads':['EXIST-DETOXIS', 'EXIST-HatEval','DETOXIS-HatEval', 'EXIST-DETOXIS-HatEval']},
-#             'encoder': {
-#                 'model':'task-identification-encoder', 
-#                 'input':['text', 'task-identification-vector']}
 #             }
 #         }
 
