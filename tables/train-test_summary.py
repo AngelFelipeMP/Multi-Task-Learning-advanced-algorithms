@@ -4,39 +4,6 @@ import config
 import os
 from utils import order
 
-# useful_cols = ['model', 
-#                 'heads',
-#                 'data',
-#                 'accuracy_val',
-#                 'me_accuracy_val',
-#                 'f1_val',
-#                 'me_f1_val',
-#                 'recall_val',
-#                 'me_recall_val',
-#                 'precision_val', 
-#                 'me_precision_val',
-#                 'f1_weighted_val',
-#                 'me_f1_weighted_val',
-#                 'recall_weighted_val',
-#                 'me_recall_weighted_val',
-#                 'precision_weighted_val',
-#                 'me_precision_weighted_val']
-
-# new_cols = {'accuracy_val':'acc',
-#             'me_accuracy_val':'me_acc',
-#             'f1_val':'f1',
-#             'me_f1_val':'me_f1',
-#             'recall_val':'recall',
-#             'me_recall_val':'me_recall',
-#             'precision_val':'precision', 
-#             'me_precision_val':'me_precision',
-#             'f1_weighted_val':'f1_w',
-#             'me_f1_weighted_val':'me_f1_w',
-#             'recall_weighted_val':'recall_w',
-#             'me_recall_weighted_val':'me_recall_w',
-#             'precision_weighted_val':'precision_w',
-#             'me_precision_weighted_val':'me_precision_w'}
-
 useful_cols = ['model', 
                 'heads',
                 'data',
@@ -46,20 +13,14 @@ useful_cols = ['model',
                 'me_f1_val',
                 'recall_val',
                 'me_recall_val',
-                'precision_val',
+                'precision_val', 
                 'me_precision_val',
                 'f1_macro_val',
                 'me_f1_macro_val',
                 'recall_macro_val',
                 'me_recall_macro_val',
                 'precision_macro_val',
-                'me_precision_macro_val',
-                'f1_weighted_val',
-                'me_f1_weighted_val',
-                'recall_weighted_val',
-                'me_recall_weighted_val',
-                'precision_weighted_val',
-                'me_precision_weighted_val']
+                'me_precision_macro_val']
 
 new_cols = {'accuracy_val':'acc',
             'me_accuracy_val':'me_acc',
@@ -69,27 +30,18 @@ new_cols = {'accuracy_val':'acc',
             'me_recall_val':'me_recall',
             'precision_val':'precision', 
             'me_precision_val':'me_precision',
-            
-            'f1_macro_val':'f1_macro',
-            'me_f1_macro_val':'me_f1_macro',
-            'recall_macro_val':'recall_macro',
-            'me_recall_macro_val':'me_recall_macro',
-            'precision_macro_val':'precision_macro',
-            'me_precision_macro_val':'me_precision_macro',
-            
-            'f1_weighted_val':'f1_weighted',
-            'me_f1_weighted_val':'me_f1_weighted',
-            'recall_weighted_val':'recall_weighted',
-            'me_recall_weighted_val':'me_recall_weighted',
-            'precision_weighted_val':'precision_weighted',
-            'me_precision_weighted_val':'me_precision_weighted'
-            }
+            'f1_macro_val':'f1_w',
+            'me_f1_macro_val':'me_f1_w',
+            'recall_macro_val':'recall_w',
+            'me_recall_macro_val':'me_recall_w',
+            'precision_macro_val':'precision_w',
+            'me_precision_macro_val':'me_precision_w'}
 
 #load data
 models_dir = [d for d in os.listdir(config.RESULTS_PATH) if os.path.isdir(config.RESULTS_PATH+'/'+d)]
 
 # read grid search data from models
-model_results = [pd.read_csv(config.RESULTS_PATH + '/' + model + '/' + config.DOMAIN_GRID_SEARCH + '.csv', usecols=useful_cols) for model in models_dir]
+model_results = [pd.read_csv(config.RESULTS_PATH + '/' + model + '/' + config.DOMAIN_TRAIN_TEST + '.csv', usecols=useful_cols) for model in models_dir]
 
 # rename columns
 for df in model_results:
@@ -137,5 +89,3 @@ df_all = pd.concat(models_data).reset_index(inplace=False, drop=True)
 # save final table
 print(df_all.head(11))
 df_all.to_csv(config.RESULTS_PATH + '/' + 'final.csv', index=False)
-
-
