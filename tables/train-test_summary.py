@@ -7,6 +7,8 @@ from utils import order
 useful_cols = ['model', 
                 'heads',
                 'data',
+                'lr',
+                'encoder-feature-layers',
                 'accuracy_val',
                 'me_accuracy_val',
                 'f1_val',
@@ -30,12 +32,13 @@ new_cols = {'accuracy_val':'acc',
             'me_recall_val':'me_recall',
             'precision_val':'precision', 
             'me_precision_val':'me_precision',
-            'f1_macro_val':'f1_w',
-            'me_f1_macro_val':'me_f1_w',
-            'recall_macro_val':'recall_w',
-            'me_recall_macro_val':'me_recall_w',
-            'precision_macro_val':'precision_w',
-            'me_precision_macro_val':'me_precision_w'}
+            'f1_macro_val':'f1_macro',
+            'me_f1_macro_val':'me_f1_macro',
+            'recall_macro_val':'recall_macro',
+            'me_recall_macro_val':'me_recall_macro',
+            'precision_macro_val':'precision_macro',
+            'me_precision_macro_val':'me_precision_macro'
+            }
 
 #load data
 models_dir = [d for d in os.listdir(config.RESULTS_PATH) if os.path.isdir(config.RESULTS_PATH+'/'+d)]
@@ -51,7 +54,7 @@ for df in model_results:
 concat_results = pd.concat(model_results).reset_index(drop=True)
 
 # data info
-specific_data = {'EXIST':{'df':None, 'metric':'acc'}, 'HatEval':{'df':None, 'metric':'f1'}, 'DETOXIS':{'df':None, 'metric':'f1'}}
+specific_data = {'EXIST':{'df':None, 'metric':'acc'}, 'HatEval':{'df':None, 'metric':'f1_macro'}, 'DETOXIS':{'df':None, 'metric':'f1'}}
 
 # select rows belonging to certain data/task
 for name in specific_data.keys():
